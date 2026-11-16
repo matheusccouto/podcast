@@ -1,0 +1,39 @@
+C4Container
+    title Container Diagram — Podcast System
+
+    Boundary(consumers, "Listener Side") {
+        Person(listener, "Listener", "Daily listener")
+        System_Ext(player, "Podcast App", "RSS player")
+    }
+
+    System_Boundary(podcast, "Podcast System") {
+        Container(cli, "Podcast CLI", "Python 3.14 / uv / GitHub Actions", "Runs daily podcast_graph, TTS synthesis & Feed publishing")
+        Container(pages, "GitHub Pages", "gh-pages static hosting", "Hosts feed.xml & episodes/YYYY-MM-DD.json")
+        Container(releases, "GitHub Releases", "GitHub CDN assets", "Hosts episodes/YYYY-MM-DD.mp3")
+    }
+
+    Boundary(providers, "Upstream APIs") {
+        System_Ext(hn, "Hacker News API", "Firebase JSON")
+        System_Ext(jina, "Jina Reader", "r.jina.ai")
+        System_Ext(openrouter, "OpenRouter API", "LLM & Fish Audio TTS")
+    }
+
+    Rel(listener, player, "Uses")
+    Rel(player, pages, "Polls feed.xml", "HTTPS")
+    Rel(player, releases, "Streams MP3", "HTTPS")
+
+    Rel(cli, pages, "Deploys feed.xml & Episode JSON", "Git")
+    Rel(cli, releases, "Uploads Episode MP3", "HTTPS")
+    Rel(cli, hn, "Fetches Stories & comments", "HTTPS")
+    Rel(cli, jina, "Extracts Markdown", "HTTPS")
+    Rel(cli, openrouter, "Runs LLM agents & TTS", "HTTPS")
+
+    UpdateRelStyle(listener, player, $offsetX="15")
+    UpdateRelStyle(player, pages, $offsetY="-20")
+    UpdateRelStyle(player, releases, $offsetY="15")
+    UpdateRelStyle(cli, pages, $offsetX="-55")
+    UpdateRelStyle(cli, releases, $offsetX="30")
+    UpdateRelStyle(cli, hn, $offsetY="-20")
+    UpdateRelStyle(cli, jina, $offsetY="-5")
+    UpdateRelStyle(cli, openrouter, $offsetY="15")
+    UpdateLayoutConfig($c4ShapeInRow="1", $c4BoundaryInRow="3")

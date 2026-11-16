@@ -1,0 +1,23 @@
+C4Context
+    title System Context — Daily AI Podcast
+
+    Person(listener, "Listener", "Daily listener subscribing via RSS")
+    System_Ext(player, "Podcast App", "Standard RSS & MP3 podcast player")
+
+    System(podcast, "Podcast System", "Curates Hacker News Stories, writes pt-BR Script, synthesizes MP3, publishes RSS Feed")
+
+    System_Ext(hn, "Hacker News API", "Firebase JSON API (top Stories & comments)")
+    System_Ext(jina, "Jina Reader", "r.jina.ai URL-to-Markdown extractor")
+    System_Ext(openrouter, "OpenRouter API", "LLM (:free / chat_model) & Fish Audio S2.1 Pro Free TTS")
+
+    Rel(listener, player, "Listens with")
+    Rel(player, podcast, "Polls feed.xml & streams MP3", "HTTPS")
+    Rel(podcast, hn, "Fetches Stories & comments", "HTTPS")
+    Rel(podcast, jina, "Extracts article Markdown", "HTTPS")
+    Rel(podcast, openrouter, "Generates Dialogue & SpeechTurns audio", "HTTPS")
+
+    UpdateRelStyle(listener, player, $offsetY="-15")
+    UpdateRelStyle(podcast, hn, $offsetX="-35", $offsetY="-10")
+    UpdateRelStyle(podcast, jina, $offsetX="-10")
+    UpdateRelStyle(podcast, openrouter, $offsetX="35", $offsetY="-10")
+    UpdateLayoutConfig($c4ShapeInRow="2", $c4BoundaryInRow="1")

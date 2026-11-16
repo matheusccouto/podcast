@@ -1,0 +1,26 @@
+C4Dynamic
+    title Dynamic Flow — Daily Episode Run
+
+    Component(cli, "Podcast CLI", "__main__.py")
+    Component(graph, "podcast_graph", "agents/workflow.py")
+    Component(curator, "curator", "agents/curator/")
+    Component(ingestion, "Ingestion", "sources/, fetcher.py")
+    Component(writer, "writer", "agents/writer/")
+    Component(tts, "OpenRouterTTS", "tts.py + ffmpeg")
+    Component(feed, "Feed", "feed.py")
+    Container(releases, "GitHub Releases", "MP3 assets")
+    Container(pages, "GitHub Pages", "feed.xml & episodes/*.json")
+    System_Ext(player, "Podcast App", "RSS subscriber")
+
+    Rel(cli, graph, "1. ainvoke(PodcastState, PodcastContext, config)")
+    Rel(graph, curator, "2. Run Curator subagent")
+    Rel(curator, ingestion, "3. Fetch HN Stories, Markdown & comments")
+    Rel(curator, graph, "4. Return validated ResearchBrief & CuratedStories")
+    Rel(graph, writer, "5. Pass Jinja2 prompt & WriterContext(personas, language)")
+    Rel(writer, graph, "6. Return validated Dialogue (Fish Audio SpeechTurns)")
+    Rel(cli, tts, "7. Verify ffmpeg & synthesize PCM -> loudnorm MP3")
+    Rel(cli, feed, "8. Feed.from_settings(settings).publish(script, audio)")
+    Rel(feed, releases, "9. Upload Episode MP3 first")
+    Rel(feed, pages, "10. Publish updated feed.xml & JSON")
+    Rel(player, pages, "11. Poll feed.xml")
+    Rel(player, releases, "12. Stream Episode MP3")

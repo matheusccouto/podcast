@@ -1,0 +1,34 @@
+C4Component
+    title Component Diagram — Podcast CLI (src/podcast/)
+
+    Boundary(upstream, "Upstream APIs") {
+        System_Ext(hn, "Hacker News API", "Firebase JSON")
+        System_Ext(jina, "Jina Reader", "r.jina.ai")
+        System_Ext(openrouter, "OpenRouter API", "LLM & Fish Audio TTS")
+    }
+
+    Container_Boundary(cli, "Podcast CLI (src/podcast/)") {
+        Component(entry, "CLI Entrypoint", "__main__.py, settings.py, models.py", "Loads Settings, Persona definitions & domain models")
+        Component(ingestion, "Ingestion Adapters", "sources/hackernews.py, fetcher.py", "HackerNewsSource & JinaFetcher async httpx clients")
+        Component(agents, "Editorial Workflow", "agents/ (LangGraph + LangChain)", "Module-level podcast_graph orchestrating curator & writer")
+        Component(tts, "Audio Synthesizer", "tts.py", "OpenRouterTTS + upfront ffmpeg loudnorm MP3 encoding")
+        Component(publishing, "Feed Publisher", "feed.py", "Feed.from_settings writes Episode JSON/MP3 & feed.xml")
+    }
+
+    Boundary(hosting, "GitHub & CI Hosting") {
+        Container(pages, "GitHub Pages", "gh-pages", "feed.xml & episodes/*.json")
+        Container(releases, "GitHub Releases", "CDN assets", "episodes/*.mp3")
+    }
+
+    Rel(entry, agents, "Invokes podcast_graph.ainvoke(state, context, config)")
+    Rel(agents, ingestion, "Calls via Curator ToolRuntime")
+    Rel(ingestion, hn, "Stories & comments", "HTTPS")
+    Rel(ingestion, jina, "Article Markdown", "HTTPS")
+    Rel(agents, openrouter, "ChatOpenRouter completions", "HTTPS")
+    Rel(entry, tts, "Synthesizes Script.turns")
+    Rel(tts, openrouter, "Fish Audio PCM audio", "HTTPS")
+    Rel(entry, publishing, "Publishes Script + SynthesizedAudio")
+    Rel(publishing, pages, "Outputs dist/feed.xml & JSON for Git deploy")
+    Rel(publishing, releases, "Outputs dist/episodes/*.mp3 for upload")
+
+    UpdateLayoutConfig($c4ShapeInRow="1", $c4BoundaryInRow="3")

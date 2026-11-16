@@ -1,0 +1,21 @@
+C4Component
+    title Component Diagram — Editorial Agents (src/podcast/agents/)
+
+    Container_Boundary(workflow, "src/podcast/agents/") {
+        Component(graph, "Podcast Graph", "workflow.py", "StateGraph(PodcastState, PodcastContext): START -> curate -> write_script -> END")
+        Component(curator, "Curator Subagent", "curator/agent.py + instructions.md", "create_agent + CuratorContext + CuratorState + Jinja2 Taste Profile + @after_agent")
+        Component(writer, "Writer Subagent", "writer/agent.py + instructions.md + prompt.md", "create_agent + WriterContext + Jinja2 templates + @after_agent voice check")
+        Component(model, "Configurable Chat Model", "model.py", "init_chat_model(openrouter, configurable_fields=(model, api_key))")
+    }
+
+    Component(sources, "Ingestion Tools Context", "HackerNewsSource & JinaFetcher", "Injected per run via PodcastContext -> CuratorContext")
+    System_Ext(openrouter, "OpenRouter API", "LLM endpoint")
+
+    Rel(graph, curator, "ainvoke(CuratorContext, recursion_limit=30)")
+    Rel(graph, writer, "ainvoke(WriterContext + formatted stories)")
+    Rel(curator, model, "Bound chat_model + ToolStrategy(ResearchBrief)")
+    Rel(writer, model, "Bound chat_model + ToolStrategy(Dialogue)")
+    Rel(curator, sources, "list_stories, fetch_story_content, fetch_comments via ToolRuntime")
+    Rel(model, openrouter, "LLM inference", "HTTPS")
+
+    UpdateLayoutConfig($c4ShapeInRow="2", $c4BoundaryInRow="1")

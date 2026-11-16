@@ -1,0 +1,183 @@
+"""Tests for Pydantic validations and the LangGraph podcast_graph."""
+
+from datetime import date
+from typing import TYPE_CHECKING
+
+import pytest
+from pydantic import ValidationError
+
+from podcast.agents import PodcastContext, PodcastState, podcast_graph
+from podcast.feed import Feed
+from podcast.fetcher import JinaFetcher
+from podcast.models import ResearchBrief, Script, Segment, Story, SynthesizedAudio
+from podcast.sources import HackerNewsSource
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from podcast.settings import Settings
+
+
+class InMemorySource(HackerNewsSource):
+    """In-memory HackerNewsSource returning controlled test Stories and comments."""
+
+    def __init__(
+        self,
+        stories: list[Story],
+        comments: dict[str, list[str]],
+    ) -> None:
+        """Store static test Stories and comment lists."""
+        super().__init__()
+        self._stories = stories
+        self._comments = comments
+
+    async def fetch_stories(self, limit: int = 30) -> list[Story]:
+        """Return up to `limit` configured test Stories."""
+        return self._stories[:limit]
+
+    async def fetch_comments(self, story_id: str, limit: int = 15) -> list[str]:
+        """Return up to `limit` configured comments for `story_id`."""
+        return self._comments.get(story_id, [])[:limit]
+
+
+class InMemoryFetcher(JinaFetcher):
+    """In-memory JinaFetcher returning controlled readable or unreadable bodies."""
+
+    def __init__(self, contents: dict[str, str | None]) -> None:
+        """Store static URL-to-content mappings."""
+        super().__init__()
+        self._contents = contents
+
+    async def fetch_content(self, url: str) -> str | None:
+        """Return preconfigured Markdown body or None for `url`."""
+        return self._contents.get(url)
+
+
+@pytest.fixture
+def sample_source() -> HackerNewsSource:
+    """Provide an in-memory HackerNewsSource with two readable and one bad Story."""
+    stories = [
+        Story(
+            id="9002",
+            source="hackernews",
+            title="Zero-Copy Ring Buffers in Rust Async Kernels",
+            url="https://example.com/rust-ringbuf",
+            discussion_url="https://news.ycombinator.com/item?id=9002",
+            score=640,
+            comment_count=145,
+        ),
+        Story(
+            id="9003",
+            source="hackernews",
+            title="Unreadable Paywalled Benchmark Story",
+            url="https://example.com/paywall",
+            discussion_url="https://news.ycombinator.com/item?id=9003",
+            score=410,
+            comment_count=90,
+        ),
+        Story(
+            id="9004",
+            source="hackernews",
+            title="SQLite Introduces Built-In Vector Quantization Index",
+            url="https://example.com/sqlite-vec",
+            discussion_url="https://news.ycombinator.com/item?id=9004",
+            score=520,
+            comment_count=112,
+        ),
+    ]
+    comments = {
+        "9002": [
+            "We measured similar tail-latency drops moving away from epoll.",
+            "Caveat: registered buffers require careful kernel ulimit tuning.",
+        ],
+        "9004": [
+            "Great for local desktop tools where running pgvector is overkill.",
+        ],
+    }
+    return InMemorySource(stories, comments)
+
+
+@pytest.fixture
+def sample_fetcher() -> JinaFetcher:
+    """Provide an in-memory JinaFetcher matching sample_source URLs."""
+    contents: dict[str, str | None] = {
+        "https://example.com/rust-ringbuf": (
+            "A detailed engineering story explaining how io_uring and lock-free "
+            "ring buffers in Rust cut tail latency by 42 percent in high-load "
+            "network proxies without unsafe heap allocations per packet. " * 3
+        ),
+        "https://example.com/paywall": None,
+        "https://example.com/sqlite-vec": (
+            "SQLite engineers published benchmarks showing quantized int8 vector "
+            "indexes inside single-file embedded databases reach 12ms p99 search "
+            "on one million embeddings with zero external daemon processes. " * 3
+        ),
+    }
+    return InMemoryFetcher(contents)
+
+
+@pytest.fixture
+def graph_settings(tmp_path: Path, live_settings: Settings) -> Settings:
+    """Clone live_settings with isolated tmp_path dist dir and distinct test voices."""
+    return live_settings.model_copy(
+        update={
+            "podcast_dist_dir": tmp_path / "dist",
+            "persona_a_voice_id": "voice-a",
+            "persona_b_voice_id": "voice-b",
+        },
+    )
+
+
+@pytest.mark.parametrize(
+    "segments",
+    [
+        [Segment(story_id="1", title="One", is_lead=False)],
+        [
+            Segment(story_id="1", title="One", is_lead=True),
+            Segment(story_id="1", title="Duplicate", is_lead=False),
+        ],
+    ],
+)
+def test_research_brief_enforces_single_lead_and_unique_ids(
+    segments: list[Segment],
+) -> None:
+    """ResearchBrief rejects duplicate story_ids or missing/multiple lead flags."""
+    with pytest.raises(ValidationError):
+        ResearchBrief(title="Test", summary="Summary", segments=segments)
+
+
+async def test_podcast_graph_curates_writes_and_publishes(
+    graph_settings: Settings,
+    sample_source: HackerNewsSource,
+    sample_fetcher: JinaFetcher,
+) -> None:
+    """LangGraph workflow curates readable Stories, writes turns, and publishes."""
+    result = await podcast_graph.ainvoke(
+        PodcastState(episode_date=date(2026, 11, 15)),
+        context=PodcastContext(
+            personas=graph_settings.personas,
+            language=graph_settings.podcast_language,
+            source=sample_source,
+            fetcher=sample_fetcher,
+        ),
+        config=graph_settings.llm_config,
+    )
+    script: Script = result["script"]
+
+    assert script.published_at == date(2026, 11, 15)
+    assert script.language == "pt-BR"
+    assert script.segments
+    segment_ids = {segment.story_id for segment in script.segments}
+    assert "9003" not in segment_ids
+    assert segment_ids & {"9002", "9004"}
+
+    valid_voices = {persona.voice_id for persona in graph_settings.personas}
+    assert len(script.turns) >= 4
+    assert {turn.voice for turn in script.turns} == valid_voices
+
+    episode = Feed.from_settings(graph_settings).publish(
+        script,
+        SynthesizedAudio(mp3_bytes=b"ID3testbytes", duration_seconds=360),
+    )
+    assert episode.published_at == date(2026, 11, 15)
+    assert (graph_settings.podcast_dist_dir / "feed.xml").exists()

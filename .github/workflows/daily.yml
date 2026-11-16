@@ -1,0 +1,67 @@
+name: Daily Podcast
+
+on:
+  schedule:
+    - cron: "0 9 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish-episode:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Set up uv and install dependencies
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Sync environment
+        run: uv sync --frozen --no-dev
+
+      - name: Hydrate existing feed.xml and episode metadata from gh-pages
+        run: |
+          mkdir -p dist/episodes
+          if git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            git fetch origin gh-pages:gh-pages
+            git show gh-pages:feed.xml > dist/feed.xml 2>/dev/null || true
+            for file in $(git ls-tree -r --name-only gh-pages -- episodes | grep '\.json$' || true); do
+              git show "gh-pages:${file}" > "dist/${file}"
+            done
+          fi
+
+      - name: Generate daily episode
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          PERSONA_A_VOICE_ID: ${{ secrets.PERSONA_A_VOICE_ID }}
+          PERSONA_B_VOICE_ID: ${{ secrets.PERSONA_B_VOICE_ID }}
+          LLM_MODEL: ${{ vars.LLM_MODEL || 'baidu/ernie-5.5-flash-preview:free' }}
+          TTS_MODEL: ${{ vars.TTS_MODEL || 'fish-audio/s2.1-pro-free:free' }}
+          PODCAST_BASE_URL: ${{ vars.PODCAST_BASE_URL || format('https://{0}.github.io/{1}', github.repository_owner, github.event.repository.name) }}
+          PODCAST_RELEASES_BASE_URL: ${{ vars.PODCAST_RELEASES_BASE_URL || format('https://github.com/{0}/releases/download/episodes', github.repository) }}
+          PODCAST_DIST_DIR: dist
+        run: uv run podcast
+
+      - name: Upload episode MP3 to GitHub Releases first
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view episodes >/dev/null 2>&1; then
+            gh release create episodes --title "Podcast Episodes" --notes "Audio assets for RSS feed enclosures."
+          fi
+          gh release upload episodes dist/episodes/*.mp3 --clobber
+          rm -f dist/episodes/*.mp3
+
+      - name: Deploy feed.xml and episode metadata to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          keep_files: true

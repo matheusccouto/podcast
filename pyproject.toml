@@ -1,0 +1,64 @@
+[project]
+name = "podcast"
+version = "0.1.0"
+description = "Podcast"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Matheus Couto", email = "matheusccouto@gmail.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "click>=8.1.0",
+    "httpx>=0.28.1",
+    "jinja2>=3.1.0",
+    "langchain>=1.0.0",
+    "langchain-openrouter>=0.2.0",
+    "pydantic>=2.11.0",
+    "pydantic-settings>=2.8.0",
+]
+
+[project.scripts]
+podcast = "podcast.__main__:main"
+
+[build-system]
+requires = ["uv_build>=0.13.8,<0.14.0"]
+build-backend = "uv_build"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "D203",  # Incompatible with D211
+    "D213",  # Incompatible with D212
+    "COM812",  # Incompatible with ruff format
+    "ISC001",  # Incompatible with ruff format
+    "CPY001",  # Missing copyright notice
+]
+
+[tool.ruff.lint.flake8-type-checking]
+runtime-evaluated-base-classes = [
+    "pydantic.BaseModel",
+    "pydantic_settings.BaseSettings",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = [
+    "S101",  # Checks for uses of the assert keyword
+    "PLR2004",  # Checks for the use of unnamed numerical constants ("magic") values in comparisons
+]
+"evals/*" = [
+    "S101",  # Checks for uses of the assert keyword
+    "PLR2004",  # Checks for the use of unnamed numerical constants ("magic") values in comparisons
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[dependency-groups]
+dev = [
+    "deepeval>=4.3.4",
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.5.0",
+]
