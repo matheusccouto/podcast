@@ -1303,6 +1303,7 @@ dependencies = [
     { name = "langchain-openrouter" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
+    { name = "python-ffmpeg" },
 ]
 
 [package.dev-dependencies]
@@ -1321,6 +1322,7 @@ requires-dist = [
     { name = "langchain-openrouter", specifier = ">=0.2.0" },
     { name = "pydantic", specifier = ">=2.11.0" },
     { name = "pydantic-settings", specifier = ">=2.8.0" },
+    { name = "python-ffmpeg", specifier = ">=2.0.12" },
 ]
 
 [package.metadata.requires-dev]
@@ -1528,6 +1530,18 @@ wheels = [
 ]
 
 [[package]]
+name = "pyee"
+version = "16.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ab/bc/8d7e802a90112ce62c6cbcdeb519c79b966c528956054fa43b6c2e5e5993/pyee-16.1.0.tar.gz", hash = "sha256:fe092d3a2a66f0f6a277fb227b078d3d849318da9a9d5d2f6576143236e84e48", size = 138156, upload-time = "2026-11-14T18:06:23.782Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/92/59/21807600b85ab28826c5096772d7ec3cca74c767ef07dc33df5ef3906098/pyee-16.1.0-py3-none-any.whl", hash = "sha256:45aaa35313906a780c539bd640ffba106d86dd63d3fd46b76d718bd611682995", size = 17220, upload-time = "2026-11-14T18:06:22.417Z" },
+]
+
+[[package]]
 name = "pyfiglet"
 version = "1.0.4"
 source = { registry = "https://pypi.org/simple" }
@@ -1618,6 +1632,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/74/26/2fbeedb218a787a5eea551c7532cac4e009f83d689dd2faa0d0353473f86/python_dotenv-1.2.4.tar.gz", hash = "sha256:f0d53e69935a851c0dcc78f3ab7aaccd8cabef0b92382b576b824212902873c0", size = 60824, upload-time = "2026-10-01T05:36:10Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/60/d1/38f3a3405989a89ac18390803e70c6ad7c7760da4f9b83cbeca0c44a0c72/python_dotenv-1.2.4-py3-none-any.whl", hash = "sha256:42269a8a5b3fd54ffa6f3d84b18abed50064717576b4ecf03dc4a55d8aa04fdc", size = 23266, upload-time = "2026-10-01T05:36:08.633Z" },
+]
+
+[[package]]
+name = "python-ffmpeg"
+version = "2.0.12"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyee" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/dd/4d/7ecffb341d646e016be76e36f5a42cb32f409c9ca21a57b68f067fad3fc7/python_ffmpeg-2.0.12.tar.gz", hash = "sha256:19ac80af5a064a2f53c245af1a909b2d7648ea045500d96d3bcd507b88d43dc7", size = 14126292, upload-time = "2024-04-15T10:15:31.878Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7f/6d/02e817aec661defe148cb9eb0c4eca2444846305f625c2243fb9f92a9045/python_ffmpeg-2.0.12-py3-none-any.whl", hash = "sha256:d86697da8dfb39335183e336d31baf42fb217468adf5ac97fd743898240faae3", size = 14411, upload-time = "2024-04-15T10:15:28.966Z" },
 ]
 
 [[package]]

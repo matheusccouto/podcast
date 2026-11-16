@@ -1,8 +1,9 @@
 name: Daily Podcast
 
 on:
-  schedule:
-    - cron: "0 9 * * *"
+  # Disabled for now; uncomment to enable daily 09:00 UTC runs:
+  # schedule:
+  #   - cron: "0 9 * * *"
   workflow_dispatch:
 
 permissions:

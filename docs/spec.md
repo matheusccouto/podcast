@@ -22,7 +22,7 @@ podcast/
 ├── .env.example                          # Reference env vars for agents & CI
 ├── .github/
 │   └── workflows/
-│       └── daily.yml                     # Daily cron + workflow_dispatch → Releases + Pages
+│       └── daily.yaml                    # Disabled cron (commented) + workflow_dispatch → Releases + Pages
 ├── AGENTS.md                             # Project commands & standards
 ├── GLOSSARY.md                             # Canonical domain vocabulary
 ├── pyproject.toml                        # Entrypoint: podcast = "podcast.__main__:main"
@@ -44,7 +44,7 @@ podcast/
 │   ├── models.py                         # Zero-dependency Pydantic models + validation
 │   ├── settings.py                       # `Settings(BaseSettings)` + `Persona` definitions
 │   ├── fetcher.py                        # `JinaFetcher` (`r.jina.ai`)
-│   ├── tts.py                            # `OpenRouterTTS` (`fish-audio/s2.1-pro-free:free` PCM -> `ffmpeg` MP3)
+│   ├── tts.py                            # `OpenRouterTTS` (`fish-audio/s2.1-pro-free:free` PCM -> `python-ffmpeg` MP3)
 │   ├── feed.py                           # `Feed` (`publish` -> `episodes/` + `feed.xml`)
 │   ├── sources/
 │   │   ├── __init__.py
@@ -113,7 +113,7 @@ podcast/
 - **`podcast_graph` (`agents/workflow.py`):** Module-level compiled `StateGraph(PodcastState, context_schema=PodcastContext)` (`START -> curate -> write_script -> END`) invoked via `.ainvoke(PodcastState(...), context=PodcastContext(...), config=settings.llm_config)`.
 
 ### 4.3 `tts.py`
-- **`OpenRouterTTS.synthesize(turns, *, title)`:** Verifies `ffmpeg` upfront, sends `{"model": model, "input": [t.model_dump() for t in turns], "response_format": "pcm"}` to `{base_url}/audio/speech`, requires explicit `rate=` and `channels=` in PCM `Content-Type`, and encodes normalized ID3 MP3 via `ffmpeg -af loudnorm` returning `SynthesizedAudio`.
+- **`OpenRouterTTS.synthesize(turns, *, title)`:** Verifies `ffmpeg` upfront, sends `{"model": model, "input": [t.model_dump() for t in turns], "response_format": "pcm"}` to `{base_url}/audio/speech`, requires explicit `rate=` and `channels=` in PCM `Content-Type`, and encodes normalized ID3 MP3 via `python-ffmpeg` (`ffmpeg.asyncio.FFmpeg`) with `-af loudnorm`, returning `SynthesizedAudio`.
 
 ### 4.4 `feed.py` & `__main__.py`
 - **`Feed.from_settings(settings)` & `Feed.publish(script, audio)`:** Writes `dist/episodes/YYYY-MM-DD.mp3`, `dist/episodes/YYYY-MM-DD.json`, and regenerates `dist/feed.xml` newest-first.
@@ -121,9 +121,9 @@ podcast/
 
 ---
 
-## 5. CI/CD & Hosting (`.github/workflows/daily.yml`)
+## 5. CI/CD & Hosting (`.github/workflows/daily.yaml`)
 
-Runs on daily `schedule` cron (`09:00 UTC` / `06:00 BRT`) and `workflow_dispatch`:
+Currently disabled from automatic runs (`schedule` cron `09:00 UTC` / `06:00 BRT` commented out; `workflow_dispatch` retained):
 1. Checkout `main`, install `uv` dependencies and `ffmpeg`.
 2. Hydrate prior `feed.xml` and `episodes/*.json` from existing `gh-pages` branch into `dist/`.
 3. Run `uv run podcast` using GitHub Actions Secrets (`OPENROUTER_API_KEY`, `PERSONA_A_VOICE_ID`, `PERSONA_B_VOICE_ID`).
