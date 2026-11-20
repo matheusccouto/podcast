@@ -24,7 +24,7 @@ from deepeval.models.system_one.schema import (
 from deepeval.test_case import SingleTurnParams
 from pydantic import BaseModel, Field, SecretStr, ValidationError
 
-from evals.download_golden import GoldenCase
+from evals.golden import GoldenCase
 from podcast.models import MAX_CONTENT_CHARS
 from podcast.settings import Settings
 

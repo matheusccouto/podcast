@@ -147,7 +147,7 @@ class ResearchBrief(_DomainModel):
 
 
 class SpeechTurn(_DomainModel):
-    """Single TTS turn matching OpenRouter Fish Audio SpeechTurn schema."""
+    """Single spoken TTS turn for one Persona voice."""
 
     voice: str = Field(min_length=1)
     text: str

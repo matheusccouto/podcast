@@ -2,33 +2,33 @@ C4Component
     title Component Diagram — Podcast CLI (src/podcast/)
 
     Boundary(upstream, "Upstream APIs") {
-        System_Ext(hn, "Hacker News API", "Firebase JSON")
-        System_Ext(jina, "Jina Reader", "r.jina.ai")
-        System_Ext(openrouter, "OpenRouter API", "LLM & Fish Audio TTS")
+        System_Ext(sources, "News Sources", "Stories & comments")
+        System_Ext(extractor, "Content Extractor", "Readable article text")
+        System_Ext(ai, "AI Provider", "LLM & TTS APIs")
     }
 
     Container_Boundary(cli, "Podcast CLI (src/podcast/)") {
-        Component(entry, "CLI Entrypoint", "__main__.py, settings.py, models.py", "Pydantic Settings CliApp, shared httpx.AsyncClient & frozen domain models")
-        Component(ingestion, "Ingestion Adapters", "sources/, fetcher.py", "Source & ContentFetcher protocols (HackerNewsSource, JinaFetcher)")
-        Component(agents, "Editorial Workflow", "agents/ (LangGraph + LangChain)", "Module-level podcast_graph orchestrating curator & writer")
-        Component(tts, "Audio Synthesizer", "tts.py", "OpenRouterTTS (_request_pcm + _encode_mp3) via ffmpeg loudnorm")
-        Component(publishing, "Feed Publisher", "feed.py, feed.xml.j2", "Feed.from_settings renders Jinja2 RSS & writes Episode JSON/MP3")
+        Component(entry, "CLI & Core", "__main__.py, settings.py, models.py", "CLI entrypoint, settings, shared HTTP client & domain models")
+        Component(ingestion, "Ingestion Adapters", "sources/, fetcher.py", "Source & ContentFetcher protocols and adapters")
+        Component(agents, "Editorial Workflow", "agents/", "Workflow orchestrating nested Curator & Writer subagents")
+        Component(tts, "Audio Synthesizer", "tts.py", "Multi-speaker TTS synthesis and normalized MP3 encoding")
+        Component(publishing, "Feed Publisher", "feed/", "Renders RSS 2.0 template and writes Episode JSON/MP3")
     }
 
     Boundary(hosting, "GitHub & CI Hosting") {
-        Container(pages, "GitHub Pages", "gh-pages", "feed.xml & episodes/*.json")
-        Container(releases, "GitHub Releases", "CDN assets", "episodes/*.mp3")
+        Container(pages, "GitHub Pages", "gh-pages", "feed.xml & Episode JSON")
+        Container(releases, "GitHub Releases", "CDN assets", "Episode MP3 files")
     }
 
-    Rel(entry, agents, "Invokes podcast_graph.ainvoke(state, context, config)")
-    Rel(agents, ingestion, "Calls via Curator ToolRuntime")
-    Rel(ingestion, hn, "Stories & comments", "HTTPS")
-    Rel(ingestion, jina, "Article Markdown", "HTTPS")
-    Rel(agents, openrouter, "ChatOpenRouter completions", "HTTPS")
-    Rel(entry, tts, "Synthesizes Script.turns")
-    Rel(tts, openrouter, "Fish Audio PCM audio", "HTTPS")
+    Rel(entry, agents, "Runs editorial workflow")
+    Rel(agents, ingestion, "Calls via Source & ContentFetcher protocols")
+    Rel(ingestion, sources, "Stories & comments", "HTTPS")
+    Rel(ingestion, extractor, "Article text", "HTTPS")
+    Rel(agents, ai, "LLM inference", "HTTPS")
+    Rel(entry, tts, "Synthesizes Script turns")
+    Rel(tts, ai, "Multi-speaker PCM audio", "HTTPS")
     Rel(entry, publishing, "Publishes Script + SynthesizedAudio")
-    Rel(publishing, pages, "Outputs dist/feed.xml & JSON for Git deploy")
-    Rel(publishing, releases, "Outputs dist/episodes/*.mp3 for upload")
+    Rel(publishing, pages, "Outputs feed.xml & JSON for Git deploy")
+    Rel(publishing, releases, "Outputs Episode MP3 for upload")
 
     UpdateLayoutConfig($c4ShapeInRow="1", $c4BoundaryInRow="3")

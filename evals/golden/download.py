@@ -17,7 +17,7 @@ from podcast.fetcher import JinaFetcher
 from podcast.models import SpeechTurn
 
 _NPR_FEED_URL = "https://feeds.npr.org/510325/podcast.xml"
-_GOLDEN_DIR = Path(__file__).parent / "golden"
+_GOLDEN_DIR = Path(__file__).parent
 _MAX_DURATION_SECONDS = 600
 _MIN_HOST_TURNS = 3
 _MIN_SOURCES = 2

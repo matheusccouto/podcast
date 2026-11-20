@@ -1,4 +1,4 @@
-"""Tests for Fish Audio SpeechTurn validation and OpenRouterTTS encoding."""
+"""Tests for SpeechTurn validation and OpenRouterTTS encoding."""
 
 import json
 import math
@@ -137,7 +137,7 @@ async def test_synthesize_live_audio_and_encode_mp3(
     live_settings: Settings,
     live_turns: list[SpeechTurn],
 ) -> None:
-    """OpenRouter TTS calls Fish Audio S2.1 Pro Free and encodes MP3 via ffmpeg."""
+    """Live TTS synthesis returns valid normalized MP3 audio."""
     tts = OpenRouterTTS(
         api_key=live_settings.openrouter_api_key,
         model=live_settings.tts_model,

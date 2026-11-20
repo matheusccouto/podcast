@@ -1,4 +1,4 @@
-"""Curator subagent defined directly at module level with LangChain runtime context."""
+"""Curator subagent selecting and grounding candidate Stories."""
 
 import json
 import operator
@@ -55,7 +55,7 @@ class CuratorState(AgentState[ResearchBrief]):
 
 @dynamic_prompt
 def _curator_prompt(request: ModelRequest[CuratorContext]) -> str:
-    """Render Jinja2 curation instructions using the run's episode_date."""
+    """Render curation instructions for the Episode date."""
     return _SYSTEM_TEMPLATE.format(
         episode_date=request.runtime.context.episode_date.isoformat(),
     )

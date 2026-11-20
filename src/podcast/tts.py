@@ -1,4 +1,4 @@
-"""OpenRouter Fish Audio S2.1 Pro multi-speaker TTS synthesis and MP3 encoding."""
+"""Multi-speaker TTS synthesis via OpenRouter and MP3 encoding."""
 
 import logging
 import re
@@ -20,7 +20,7 @@ _CHANNELS_RE = re.compile(r"channels=(\d+)")
 
 
 class OpenRouterTTS:
-    """Client that synthesizes Fish Audio SpeechTurns and encodes MP3 via ffmpeg."""
+    """Synthesizes multi-speaker SpeechTurns via OpenRouter and encodes MP3."""
 
     def __init__(
         self,

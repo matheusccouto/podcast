@@ -3,7 +3,8 @@
 ## Commands
 
 - `uv run podcast`: Generate and publish today's Episode.
-- `uv run pytest`: Run tests.
+- `uv run pytest`: Run offline tests.
+- `uv run pytest -m live`: Run live tests against external services.
 - `uv run --env-file .env deepeval test run evals/`: Run evals.
 - `uvx ruff check .`: Lint code.
 - `uvx ruff format --check .`: Format code.
@@ -30,6 +31,39 @@ Although never is often better than *right* now.
 If the implementation is hard to explain, it's a bad idea.
 If the implementation is easy to explain, it may be a good idea.
 Namespaces are one honking great idea -- let's do more of those!
+
+## Principles
+
+- Prefer built-in capabilities of installed libraries over custom abstractions; reach for library primitives before writing wrapper code.
+- Let external errors fail loudly rather than adding silent fallbacks.
+- Keep lists and categorizations MECE (mutually exclusive, collectively exhaustive).
+- Keep extensible areas as nested packages (`sources/`, `agents/<subagent>/`) behind `Protocol` interfaces, so new implementations plug in by matching the interface without inheriting from concrete classes.
+
+## Structure
+
+```text
+.
+├── .github/workflows/      # Scheduled and manual CI publishing
+├── docs/
+│   ├── agents/             # Issue tracker, triage labels, and domain doc conventions
+│   └── architecture/       # C4 Mermaid diagrams
+├── evals/
+│   ├── conftest.py         # Judge adapter, metrics, and dataset loader
+│   ├── golden/             # Golden reference fixtures and downloader
+│   └── ...                 # Evaluation test suites
+├── src/podcast/
+│   ├── __main__.py         # CLI entrypoint and daily pipeline orchestration
+│   ├── settings.py         # Configuration and Persona definitions
+│   ├── models.py           # Immutable domain models and validation
+│   ├── sources/            # Upstream Sources implementing Source (add new sources here)
+│   ├── fetcher.py          # Content extraction protocol and implementation
+│   ├── agents/             # Editorial workflow and nested subagent packages (add/remove here)
+│   ├── tts.py              # Audio synthesis and MP3 encoding
+│   └── feed/               # RSS 2.0 publisher and XML template
+└── tests/
+    ├── conftest.py         # Shared test fixtures
+    └── ...                 # Offline unit tests (default) and @pytest.mark.live tests
+```
 
 ## Resources
 

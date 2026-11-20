@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 _PUBLISH_TIME_UTC = time(hour=9, tzinfo=UTC)
 _RSS_TEMPLATE = Environment(autoescape=True, keep_trailing_newline=True).from_string(
-    resources.files(__package__).joinpath("feed.xml.j2").read_text("utf-8"),
+    resources.files(__package__).joinpath("feed.xml").read_text("utf-8"),
 )
 
 

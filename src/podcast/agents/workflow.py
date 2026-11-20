@@ -1,4 +1,4 @@
-"""Module-level LangGraph workflow connecting Curator and Writer subagents."""
+"""Editorial workflow connecting Curator and Writer subagents."""
 
 import logging
 from dataclasses import dataclass
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True, slots=True)
 class PodcastContext:
-    """Per-invocation runtime context passed into `podcast_graph.ainvoke`."""
+    """Per-invocation runtime dependencies for the editorial workflow."""
 
     personas: tuple[Persona, Persona]
     source: Source

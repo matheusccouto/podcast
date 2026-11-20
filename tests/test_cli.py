@@ -1,4 +1,4 @@
-"""Tests for the Pydantic Settings CliApp entrypoint in podcast.__main__."""
+"""Tests for the CLI entrypoint in podcast.__main__."""
 
 from datetime import date
 from pathlib import Path

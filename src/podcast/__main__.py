@@ -1,4 +1,4 @@
-"""Pydantic Settings CLI entrypoint for generating and publishing today's Episode."""
+"""CLI entrypoint for generating and publishing today's Episode."""
 
 import asyncio
 import logging
@@ -76,7 +76,7 @@ class PodcastCLI(Settings):
 
 
 def main() -> None:
-    """Invoke the Pydantic Settings CLI entrypoint."""
+    """Run the CLI entrypoint."""
     CliApp.run(PodcastCLI)
 
 

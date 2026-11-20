@@ -1,4 +1,4 @@
-"""Writer subagent defined directly at module level with Jinja2 templates."""
+"""Writer subagent turning curated Stories into two-Persona Dialogue."""
 
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -46,7 +46,7 @@ def format_writer_prompt(
     episode_date: date,
     stories: Sequence[CuratedStory],
 ) -> str:
-    """Render the Writer user prompt from the co-located Jinja2 template."""
+    """Render the Writer user prompt for the curated Stories."""
     return _USER_TEMPLATE.format(
         episode_date=episode_date.isoformat(),
         stories=stories,
@@ -56,7 +56,7 @@ def format_writer_prompt(
 
 @dynamic_prompt
 def _writer_prompt(request: ModelRequest[WriterContext]) -> str:
-    """Render Jinja2 scriptwriting instructions for configured Personas & language."""
+    """Render scriptwriting instructions for the configured Personas and language."""
     ctx = request.runtime.context
     return _SYSTEM_TEMPLATE.format(
         language=ctx.language,

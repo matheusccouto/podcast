@@ -1,4 +1,4 @@
-"""DeepEval JevEval evaluations comparing Writer Fish Audio JSON output."""
+"""DeepEval evaluations for Writer Script grounding and style."""
 
 import asyncio
 import json
@@ -12,7 +12,7 @@ from deepeval.metrics import BaseMetric
 from deepeval.test_case import LLMTestCase
 
 from evals.conftest import load_golden_dataset
-from evals.download_golden import GoldenStory
+from evals.golden import GoldenStory
 from podcast.agents import WriterContext, format_writer_prompt, llm_config, writer
 from podcast.models import CuratedStory, Dialogue
 from podcast.settings import Settings
@@ -20,7 +20,7 @@ from podcast.settings import Settings
 _DATASET = load_golden_dataset()
 if not _DATASET.goldens:
     pytest.skip(
-        "No fixtures in evals/golden/. Run download_golden first.",
+        "No fixtures in evals/golden/. Run evals.golden.download first.",
         allow_module_level=True,
     )
 
