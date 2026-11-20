@@ -63,13 +63,13 @@ class Settings(BaseSettings):
         """Return the two configured co-speaker Personas."""
         return (
             Persona(
-                name="Lucas",
+                name="Rafael",
                 role="Senior systems engineer and curious skeptic",
                 tone="Clear, analytical, grounded humor",
                 voice_id=self.persona_a_voice_id,
             ),
             Persona(
-                name="Mariana",
+                name="Beatriz",
                 role="AI and developer-tools builder",
                 tone="Warm, sharp storyteller who unpacks complex ideas",
                 voice_id=self.persona_b_voice_id,

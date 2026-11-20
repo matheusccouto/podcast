@@ -15,6 +15,7 @@ from podcast.models import SpeechTurn, SynthesizedAudio
 logger = logging.getLogger(__name__)
 
 _REQUEST_TIMEOUT_SECONDS = 180.0
+_TURN_PAUSE_SECONDS = 0.25
 _RATE_RE = re.compile(r"rate=(\d+)")
 _CHANNELS_RE = re.compile(r"channels=(\d+)")
 
@@ -42,7 +43,7 @@ class OpenRouterTTS:
         *,
         title: str,
     ) -> SynthesizedAudio:
-        """Synthesize SpeechTurns in one OpenRouter call and encode to MP3."""
+        """Synthesize each SpeechTurn, join PCM with turn pauses, and encode MP3."""
         if not turns:
             msg = "Cannot synthesize an empty SpeechTurn list."
             raise ValueError(msg)
@@ -51,7 +52,31 @@ class OpenRouterTTS:
             msg = "ffmpeg binary not found in PATH"
             raise FileNotFoundError(msg)
 
-        pcm_bytes, sample_rate, channels = await self._request_pcm(turns)
+        pcm_chunks: list[bytes] = []
+        audio_format: tuple[int, int] | None = None
+        ctx = (
+            nullcontext(self.client) if self.client is not None else httpx.AsyncClient()
+        )
+        async with ctx as active_client:
+            for turn in turns:
+                chunk, sample_rate, channels = await self._request_turn_pcm(
+                    active_client,
+                    turn,
+                )
+                if audio_format is None:
+                    audio_format = (sample_rate, channels)
+                elif audio_format != (sample_rate, channels):
+                    msg = (
+                        f"Inconsistent PCM format across turns: expected "
+                        f"{audio_format}, got {(sample_rate, channels)}"
+                    )
+                    raise ValueError(msg)
+                pcm_chunks.append(chunk)
+
+        assert audio_format is not None  # noqa: S101
+        sample_rate, channels = audio_format
+        pause = b"\x00" * (int(sample_rate * _TURN_PAUSE_SECONDS) * channels * 2)
+        pcm_bytes = pause.join(pcm_chunks)
         duration_seconds = round(len(pcm_bytes) / (sample_rate * channels * 2))
         mp3_bytes = await self._encode_mp3(
             ffmpeg_bin=ffmpeg_bin,
@@ -61,40 +86,39 @@ class OpenRouterTTS:
             title=title,
         )
         logger.info(
-            "Synthesized %ds MP3 (%d bytes) via %s",
+            "Synthesized %d turns into %ds MP3 (%d bytes) via %s",
+            len(turns),
             duration_seconds,
             len(mp3_bytes),
             self.model,
         )
         return SynthesizedAudio(mp3_bytes=mp3_bytes, duration_seconds=duration_seconds)
 
-    async def _request_pcm(
+    async def _request_turn_pcm(
         self,
-        turns: Sequence[SpeechTurn],
+        client: httpx.AsyncClient,
+        turn: SpeechTurn,
     ) -> tuple[bytes, int, int]:
-        """Request raw PCM bytes and parse sample rate/channels from Content-Type."""
-        payload: dict[str, object] = {
+        """Request raw PCM bytes for one SpeechTurn and parse its audio format."""
+        payload = {
             "model": self.model,
-            "input": [turn.model_dump() for turn in turns],
+            "input": turn.text,
+            "voice": turn.voice,
             "response_format": "pcm",
         }
         headers = {
             "Authorization": f"Bearer {self.api_key.get_secret_value()}",
             "Content-Type": "application/json",
         }
-        ctx = (
-            nullcontext(self.client) if self.client is not None else httpx.AsyncClient()
+        response = await client.post(
+            f"{self.base_url}/audio/speech",
+            headers=headers,
+            json=payload,
+            timeout=_REQUEST_TIMEOUT_SECONDS,
         )
-        async with ctx as active_client:
-            response = await active_client.post(
-                f"{self.base_url}/audio/speech",
-                headers=headers,
-                json=payload,
-                timeout=_REQUEST_TIMEOUT_SECONDS,
-            )
-            response.raise_for_status()
-            pcm_bytes = response.content
-            content_type = response.headers.get("content-type", "")
+        response.raise_for_status()
+        pcm_bytes = response.content
+        content_type = response.headers.get("content-type", "")
 
         rate_match = _RATE_RE.search(content_type)
         channels_match = _CHANNELS_RE.search(content_type)

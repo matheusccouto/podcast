@@ -12,7 +12,7 @@ from pydantic_settings import CliApp
 from podcast.agents import PodcastContext, PodcastState, llm_config, podcast_graph
 from podcast.feed import Feed
 from podcast.fetcher import JinaFetcher
-from podcast.models import Episode, Script
+from podcast.models import Episode, Script, validate_persona_voices
 from podcast.settings import Settings
 from podcast.sources import HackerNewsSource
 from podcast.tts import OpenRouterTTS
@@ -25,6 +25,7 @@ async def run_daily(
 ) -> Episode:
     """Execute the daily curation, scriptwriting, TTS, and publishing flow."""
     resolved = settings or Settings()
+    validate_persona_voices(resolved.personas)
     target_date = today or datetime.now(UTC).date()
 
     async with httpx.AsyncClient() as client:
@@ -67,6 +68,7 @@ class PodcastCLI(Settings):
             level=logging.INFO,
             format="%(levelname)s %(name)s: %(message)s",
         )
+        logging.getLogger("httpx").setLevel(logging.WARNING)
         episode = asyncio.run(run_daily(settings=self, today=self.episode_date))
         sys.stdout.write(
             f"Published {episode.published_at.isoformat()} "

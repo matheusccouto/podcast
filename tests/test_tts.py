@@ -72,12 +72,12 @@ async def test_synthesize_encodes_pcm_to_mp3_via_ffmpeg(
     sample_turns: list[SpeechTurn],
     sine_pcm_one_second: bytes,
 ) -> None:
-    """Synthetic PCM bytes returned by HTTP are normalized into MP3 via real ffmpeg."""
-    captured_payload: dict[str, object] = {}
+    """Per-turn PCM bytes are joined with pauses and normalized into MP3 via ffmpeg."""
+    captured_payloads: list[dict[str, object]] = []
 
     def _handler(request: httpx.Request) -> httpx.Response:
-        """Capture outgoing TTS payload and return synthetic 1s PCM bytes."""
-        captured_payload.update(json.loads(request.content))
+        """Capture outgoing per-turn TTS payload and return synthetic 1s PCM bytes."""
+        captured_payloads.append(json.loads(request.content))
         return httpx.Response(
             200,
             content=sine_pcm_one_second,
@@ -91,11 +91,17 @@ async def test_synthesize_encodes_pcm_to_mp3_via_ffmpeg(
         )
         audio = await tts.synthesize(sample_turns, title="Teste de Sintese")
 
-    assert captured_payload["model"] == "fish-audio/s2.1-pro-free:free"
-    assert captured_payload["response_format"] == "pcm"
-    assert captured_payload["input"] == [turn.model_dump() for turn in sample_turns]
+    assert captured_payloads == [
+        {
+            "model": "fish-audio/s2.1-pro-free:free",
+            "input": turn.text,
+            "voice": turn.voice,
+            "response_format": "pcm",
+        }
+        for turn in sample_turns
+    ]
     assert audio.mp3_bytes[:3] == b"ID3"
-    assert audio.duration_seconds == 1
+    assert audio.duration_seconds == 2
 
 
 async def test_synthesize_refuses_to_guess_missing_pcm_header_params(
