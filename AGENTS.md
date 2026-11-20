@@ -37,7 +37,7 @@ Namespaces are one honking great idea -- let's do more of those!
 - Prefer built-in capabilities of installed libraries over custom abstractions; reach for library primitives before writing wrapper code.
 - Let external errors fail loudly rather than adding silent fallbacks.
 - Keep lists and categorizations MECE (mutually exclusive, collectively exhaustive).
-- Keep extensible areas as nested packages (`sources/`, `agents/<subagent>/`) behind `Protocol` interfaces, so new implementations plug in by matching the interface without inheriting from concrete classes.
+- Check `docs/architecture/` after codebase changes and update any affected C4 Mermaid diagrams.
 
 ## Structure
 
@@ -73,6 +73,7 @@ Namespaces are one honking great idea -- let's do more of those!
 - https://openrouter.ai/docs/llms.txt
 - https://openrouter.ai/fish-audio/s2.1-pro-free:free/llms.txt
 - https://docs.langchain.com/llms.txt
+- https://docs.exa.ai/llms.txt
 - https://deepeval.com/llms.txt
 - https://pydantic.dev/docs/llms.txt
 - https://c4model.com/llms.txt

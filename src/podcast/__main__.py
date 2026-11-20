@@ -11,7 +11,7 @@ from pydantic_settings import CliApp
 
 from podcast.agents import PodcastContext, PodcastState, llm_config, podcast_graph
 from podcast.feed import Feed
-from podcast.fetcher import JinaFetcher
+from podcast.fetcher import ExaFetcher
 from podcast.models import Episode, Script, validate_persona_voices
 from podcast.settings import Settings
 from podcast.sources import HackerNewsSource
@@ -33,9 +33,12 @@ async def run_daily(
             PodcastState(episode_date=target_date),
             context=PodcastContext(
                 personas=resolved.personas,
+                openrouter_api_key=resolved.openrouter_api_key,
+                curator_model=resolved.curator_model,
                 language=resolved.podcast_language,
                 source=HackerNewsSource(client=client),
-                fetcher=JinaFetcher(client=client),
+                fetcher=ExaFetcher(api_key=resolved.exa_api_key, client=client),
+                client=client,
             ),
             config=llm_config(
                 model=resolved.llm_model,

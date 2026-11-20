@@ -40,7 +40,6 @@ def make_script(sample_turns: list[SpeechTurn]) -> Callable[[date, str], Script]
                     story_id="123",
                     title=title,
                     url="https://example.com/story",
-                    is_lead=True,
                     key_facts=["Fact one verified in Story."],
                 ),
             ],

@@ -1,7 +1,9 @@
 """Shared DeepEval fixtures, OpenRouter Jev adapter, and Golden dataset loader."""
 
 import json
+import math
 import os
+import re
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -21,16 +23,18 @@ from deepeval.models.system_one.schema import (
     SystemOneAnswers,
     SystemOneQuestion,
 )
-from deepeval.test_case import SingleTurnParams
+from deepeval.test_case import LLMTestCase, SingleTurnParams
 from pydantic import BaseModel, Field, SecretStr, ValidationError
 
-from evals.golden import GoldenCase
+from evals.golden import CuratorGoldenCase, GoldenCase
 from podcast.models import MAX_CONTENT_CHARS
 from podcast.settings import Settings
 
-_GOLDEN_DIR = Path(__file__).parent / "golden"
+_WRITER_GOLDEN_DIR = Path(__file__).parent / "golden" / "writer"
+_CURATOR_GOLDEN_DIR = Path(__file__).parent / "golden" / "curator"
+_LINE_COMMENT_RE = re.compile(r"//[^\n]*")
 _SYSTEM_ONE_URL = "https://openrouter.ai/api/v1/systemone"
-_DEFAULT_JEV_MODEL = "jev-1.13"
+_DEFAULT_JEV_MODEL = "jev-1.14"
 
 
 class _NoulPayload(BaseModel):
@@ -198,10 +202,72 @@ class OpenRouterJevModel(DeepEvalBaseSystemOneModel):
         return self._parse_response(response.json())
 
 
+class NDCGAtKMetric(BaseMetric):
+    """Deterministic exponential NDCG@k metric comparing ranked story_id lists."""
+
+    def __init__(self, *, k: int = 5, threshold: float = 0.5) -> None:
+        """Configure ranking cutoff `k` and passing threshold."""
+        self.k = k
+        self._threshold = threshold
+        self.threshold = threshold
+        self.score = 0.0
+        self.success = False
+        self.reason = ""
+
+    @staticmethod
+    def _dcg(relevances: list[int]) -> float:
+        """Compute exponential discounted cumulative gain for a relevance sequence."""
+        return sum(
+            (2**rel - 1) / math.log2(rank + 2)
+            for rank, rel in enumerate(relevances)
+            if rel > 0
+        )
+
+    def measure(self, test_case: LLMTestCase) -> float:
+        """Score predicted top-k story_ids against the full expected ranking."""
+        expected: list[str] = json.loads(test_case.expected_output or "[]")
+        predicted_raw: list[str] = json.loads(test_case.actual_output or "[]")
+        predicted = list(dict.fromkeys(predicted_raw))[: self.k]
+
+        if not expected:
+            self.score = 0.0
+            self.success = False
+            self.reason = "Expected ranking is empty."
+            return self.score
+
+        grade_for = {
+            story_id: len(expected) - idx for idx, story_id in enumerate(expected)
+        }
+        dcg = self._dcg([grade_for.get(story_id, 0) for story_id in predicted])
+        ideal_grades = list(range(len(expected), 0, -1))[: self.k]
+        idcg = self._dcg(ideal_grades)
+        score = dcg / idcg if idcg > 0 else 0.0
+        self.score = score
+        self.success = score >= self._threshold
+        self.reason = (
+            f"NDCG@{self.k}={score:.4f} (threshold={self._threshold}); "
+            f"predicted={predicted}, expected={expected}"
+        )
+        return score
+
+    async def a_measure(self, test_case: LLMTestCase) -> float:
+        """Async interface delegating to deterministic synchronous calculation."""
+        return self.measure(test_case)
+
+    def is_successful(self) -> bool:
+        """Return whether the last measured NDCG@k met the threshold."""
+        return bool(self.success)
+
+    @property
+    def __name__(self) -> str:  # type: ignore[override]
+        """Display name used in DeepEval reports."""
+        return f"NDCG@{self.k}"
+
+
 def load_golden_dataset() -> EvaluationDataset:
-    """Load evals/golden/*.json into a DeepEval EvaluationDataset of Goldens."""
+    """Load evals/golden/writer/*.json into a DeepEval EvaluationDataset."""
     goldens: list[Golden] = []
-    for path in sorted(_GOLDEN_DIR.glob("*.json")):
+    for path in sorted(_WRITER_GOLDEN_DIR.glob("*.json")):
         case = GoldenCase.model_validate_json(path.read_text(encoding="utf-8"))
         goldens.append(
             Golden(
@@ -221,6 +287,30 @@ def load_golden_dataset() -> EvaluationDataset:
             ),
         )
     return EvaluationDataset(goldens=goldens)
+
+
+def load_curator_dataset() -> EvaluationDataset:
+    """Load labeled evals/golden/curator/*.json files into an EvaluationDataset."""
+    goldens: list[Golden] = []
+    for path in sorted(_CURATOR_GOLDEN_DIR.glob("*.json")):
+        raw = _LINE_COMMENT_RE.sub("", path.read_text(encoding="utf-8"))
+        case = CuratorGoldenCase.model_validate_json(raw)
+        if not case.ranking:
+            continue
+        goldens.append(
+            Golden(
+                name=path.stem,
+                input=case.date.isoformat(),
+                expected_output=json.dumps(case.ranking),
+            ),
+        )
+    return EvaluationDataset(goldens=goldens)
+
+
+@pytest.fixture(scope="session")
+def curator_metrics() -> list[BaseMetric]:
+    """Provide deterministic NDCG@5 metric for Curator ranking evaluations."""
+    return [NDCGAtKMetric(k=5, threshold=0.5)]
 
 
 @pytest.fixture(scope="session")

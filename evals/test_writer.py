@@ -20,7 +20,7 @@ from podcast.settings import Settings
 _DATASET = load_golden_dataset()
 if not _DATASET.goldens:
     pytest.skip(
-        "No fixtures in evals/golden/. Run evals.golden.download first.",
+        "No fixtures in evals/golden/writer/. Run evals.golden.writer.download first.",
         allow_module_level=True,
     )
 
@@ -44,9 +44,8 @@ def test_scriptwriter_matches_indicator_quality_bar(
             title=story.title,
             url=story.url,
             content=story.content,
-            is_lead=(index == 0),
         )
-        for index, story in enumerate(golden_stories)
+        for story in golden_stories
     ]
     prompt = format_writer_prompt(date.fromisoformat(golden.input), stories)
     result = asyncio.run(

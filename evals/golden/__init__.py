@@ -1,5 +1,6 @@
-"""Golden reference fixtures and downloader for scriptwriter evaluations."""
+"""Golden reference fixtures for Writer and Curator evaluations."""
 
-from evals.golden.download import GoldenCase, GoldenStory
+from evals.golden.curator import CuratorGoldenCase
+from evals.golden.writer import GoldenCase, GoldenStory
 
-__all__ = ["GoldenCase", "GoldenStory"]
+__all__ = ["CuratorGoldenCase", "GoldenCase", "GoldenStory"]

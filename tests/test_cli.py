@@ -26,6 +26,7 @@ def test_cli_help_lists_options_and_hides_secrets(
     assert "--podcast-language" in output
     assert "--podcast-dist-dir" in output
     assert "--openrouter-api-key" not in output
+    assert "--exa-api-key" not in output
 
 
 def test_cli_applies_option_overrides(
@@ -56,6 +57,7 @@ def test_cli_applies_option_overrides(
         )
 
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("EXA_API_KEY", "test-exa-key")
     monkeypatch.setattr(cli_module, "run_daily", _fake_run_daily)
     dist_dir = tmp_path / "out"
 

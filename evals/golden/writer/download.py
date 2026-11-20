@@ -13,8 +13,9 @@ from urllib.parse import urlparse
 import httpx
 from pydantic import BaseModel, ValidationError
 
-from podcast.fetcher import JinaFetcher
+from podcast.fetcher import ExaFetcher
 from podcast.models import SpeechTurn
+from podcast.settings import Settings
 
 _NPR_FEED_URL = "https://feeds.npr.org/510325/podcast.xml"
 _GOLDEN_DIR = Path(__file__).parent
@@ -208,7 +209,7 @@ async def _build_case(
         return None
 
     urls = external_urls[:4]
-    fetcher = JinaFetcher(client=client)
+    fetcher = ExaFetcher(api_key=Settings().exa_api_key, client=client)
     fetched = await asyncio.gather(
         *(fetcher.fetch_content(url) for url in urls),
         return_exceptions=True,

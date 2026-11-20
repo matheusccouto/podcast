@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     )
 
     openrouter_api_key: CliSuppress[SecretStr]
+    exa_api_key: CliSuppress[SecretStr]
+    curator_model: str = Field(
+        default="jev-1.14",
+        description="OpenRouter System One model ID for Curator ranking.",
+    )
     llm_model: str = Field(
         default="baidu/ernie-5.5-flash-preview:free",
         description="OpenRouter LLM model ID.",

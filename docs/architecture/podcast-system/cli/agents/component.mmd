@@ -3,17 +3,17 @@ C4Component
 
     Container_Boundary(workflow, "src/podcast/agents/") {
         Component(graph, "Editorial Graph", "workflow.py", "Orchestrates curation -> scriptwriting flow")
-        Component(curator, "Curator Subagent", "curator/", "Curates Stories using Taste Profile and grounding validation")
+        Component(curator, "Curator", "curator/", "Ranks Stories via OpenRouter Jev and hydrates readable picks")
         Component(writer, "Writer Subagent", "writer/", "Writes two-Persona Dialogue with voice validation")
         Component(model, "Chat Model", "model.py", "Runtime-configurable LLM binding")
     }
 
     Component(sources, "Ingestion Protocols", "Source & ContentFetcher", "Injected per run into workflow and Curator")
-    System_Ext(ai, "AI Provider", "LLM API")
+    System_Ext(ai, "AI Provider", "LLM & System One APIs")
 
-    Rel(graph, curator, "Curates candidate Stories")
+    Rel(graph, curator, "Ranks & hydrates candidate Stories")
     Rel(graph, writer, "Writes Script Dialogue")
-    Rel(curator, model, "Structured ResearchBrief output")
+    Rel(curator, ai, "Jev System One ranking", "HTTPS")
     Rel(writer, model, "Structured Dialogue output")
     Rel(curator, sources, "Fetches Stories, content & comments")
     Rel(model, ai, "LLM inference", "HTTPS")

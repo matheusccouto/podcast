@@ -1,24 +1,18 @@
-"""Editorial workflow connecting Curator and Writer subagents."""
+"""Editorial workflow connecting Jev Curator and Writer subagent."""
 
 import logging
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 
+import httpx
 from langgraph.graph import END, START, StateGraph
 from langgraph.runtime import Runtime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 
-from podcast.agents.curator import CuratorContext, curator
+from podcast.agents.curator import Curator
 from podcast.agents.writer import WriterContext, format_writer_prompt, writer
 from podcast.fetcher import ContentFetcher
-from podcast.models import (
-    CuratedStory,
-    Dialogue,
-    Persona,
-    ResearchBrief,
-    Script,
-    Segment,
-)
+from podcast.models import CuratedStory, Dialogue, Persona, Script, Segment
 from podcast.sources import Source
 
 logger = logging.getLogger(__name__)
@@ -29,17 +23,18 @@ class PodcastContext:
     """Per-invocation runtime dependencies for the editorial workflow."""
 
     personas: tuple[Persona, Persona]
+    openrouter_api_key: SecretStr
     source: Source
     fetcher: ContentFetcher
+    curator_model: str = "jev-1.14"
     language: str = "pt-BR"
+    client: httpx.AsyncClient | None = None
 
 
 class PodcastState(BaseModel):
     """Shared LangGraph workflow state flowing from curation to scriptwriting."""
 
     episode_date: date
-    title: str = ""
-    summary: str = ""
     segments: list[Segment] = Field(default_factory=list)
     curated_stories: list[CuratedStory] = Field(default_factory=list)
     script: Script | None = None
@@ -49,29 +44,25 @@ async def _curate_node(
     state: PodcastState,
     runtime: Runtime[PodcastContext],
 ) -> dict[str, object]:
-    """Invoke the Curator subagent with runtime Source/Fetcher context."""
+    """Rank and hydrate the previous day's Stories via Jev Curator."""
     ctx = runtime.context
-    result = await curator.ainvoke(
-        {"messages": [{"role": "user", "content": "Curate today's tech Stories."}]},
-        context=CuratorContext(
-            episode_date=state.episode_date,
-            source=ctx.source,
-            fetcher=ctx.fetcher,
-        ),
-        config={"recursion_limit": 30},
+    news_day = state.episode_date - timedelta(days=1)
+    curator = Curator(
+        api_key=ctx.openrouter_api_key,
+        model=ctx.curator_model,
+        source=ctx.source,
+        fetcher=ctx.fetcher,
+        client=ctx.client,
     )
-    brief: ResearchBrief = result["structured_response"]
-    curated_stories: list[CuratedStory] = result["curated_stories"]
+    segments, curated_stories = await curator.curate(news_day)
     logger.info(
-        "Curated %d stories for %s: %s",
+        "Curated %d stories for %s (lead: %s)",
         len(curated_stories),
-        state.episode_date.isoformat(),
-        brief.title,
+        news_day.isoformat(),
+        segments[0].title,
     )
     return {
-        "title": brief.title,
-        "summary": brief.summary,
-        "segments": result["segments"],
+        "segments": segments,
         "curated_stories": curated_stories,
     }
 
@@ -89,15 +80,16 @@ async def _write_node(
     )
     dialogue: Dialogue = result["structured_response"]
     logger.info(
-        "Wrote Script (%d turns, %d spoken words)",
+        "Wrote Script '%s' (%d turns, %d spoken words)",
+        dialogue.title,
         len(dialogue.turns),
         dialogue.spoken_word_count,
     )
     return {
         "script": Script(
             published_at=state.episode_date,
-            title=state.title,
-            summary=state.summary,
+            title=dialogue.title,
+            summary=dialogue.summary,
             language=ctx.language,
             segments=state.segments,
             turns=dialogue.turns,

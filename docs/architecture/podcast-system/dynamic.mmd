@@ -13,9 +13,9 @@ C4Dynamic
     System_Ext(player, "Podcast App", "RSS subscriber")
 
     Rel(cli, graph, "1. Open shared HTTP client & run editorial workflow")
-    Rel(graph, curator, "2. Run Curator subagent")
+    Rel(graph, curator, "2. Run Jev Curator for previous day")
     Rel(curator, ingestion, "3. Fetch Stories, content & comments")
-    Rel(curator, graph, "4. Return grounded ResearchBrief & CuratedStories")
+    Rel(curator, graph, "4. Return ranked Segments & CuratedStories")
     Rel(graph, writer, "5. Pass curated Stories & Persona context")
     Rel(writer, graph, "6. Return validated two-Persona Dialogue")
     Rel(cli, tts, "7. Synthesize PCM & encode loudnorm MP3")

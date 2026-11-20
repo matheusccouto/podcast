@@ -1,5 +1,5 @@
-"""Curator subagent package."""
+"""Curator package using OpenRouter System One (Jev) ranking."""
 
-from podcast.agents.curator.agent import CuratorContext, CuratorState, curator
+from podcast.agents.curator.agent import Curator
 
-__all__ = ["CuratorContext", "CuratorState", "curator"]
+__all__ = ["Curator"]

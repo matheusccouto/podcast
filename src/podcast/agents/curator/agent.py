@@ -1,191 +1,169 @@
-"""Curator subagent selecting and grounding candidate Stories."""
+"""Jev System One Curator ranking and hydrating daily candidate Stories."""
 
-import json
-import operator
-from dataclasses import dataclass
+import logging
+from contextlib import nullcontext
 from datetime import date
 from importlib import resources
-from typing import Annotated, Any, NotRequired, cast
+from typing import Any
 
-from langchain.agents import AgentState, create_agent
-from langchain.agents.middleware import ModelRequest, after_agent, dynamic_prompt
-from langchain.agents.structured_output import ToolStrategy
-from langchain.tools import ToolRuntime, tool
-from langchain_core.messages import ToolMessage
-from langchain_core.prompts import PromptTemplate
-from langgraph.runtime import Runtime
-from langgraph.types import Command
+import httpx
+from pydantic import SecretStr
 
-from podcast.agents.model import chat_model
 from podcast.fetcher import ContentFetcher
-from podcast.models import (
-    MAX_CONTENT_CHARS,
-    CuratedStory,
-    ResearchBrief,
-    Segment,
-    Story,
+from podcast.models import MAX_CONTENT_CHARS, CuratedStory, Segment, Story
+from podcast.sources import HackerNewsSource, Source
+
+logger = logging.getLogger(__name__)
+
+_SYSTEM_ONE_URL = "https://openrouter.ai/api/v1/systemone"
+_REQUEST_TIMEOUT_SECONDS = 60.0
+_TASTE_PROFILE = (
+    resources.files(__package__).joinpath("instructions.md").read_text("utf-8").strip()
 )
-from podcast.sources import Source
-
-_SYSTEM_TEMPLATE = PromptTemplate.from_template(
-    resources.files(__package__).joinpath("instructions.md").read_text("utf-8"),
-    template_format="jinja2",
-)
-
-
-@dataclass(frozen=True, slots=True)
-class CuratorContext:
-    """Per-invocation runtime dependencies injected into the Curator subagent."""
-
-    episode_date: date
-    source: Source
-    fetcher: ContentFetcher
+_SCORE_LEVELS = [
+    "Skip: Show HN, hobby/retro, niche kernel/compiler internals, or minor crypto",
+    "Low: Minor hardware/systems or niche security story",
+    "Medium: Solid software engineering, AI dev workflow, or security/privacy story",
+    "High: Major tech/business/society/policy impact or notable AI news",
+    (
+        "Headliner (#1): Biggest front-page news of the day — flagship AI launch, "
+        "major tech/business milestone, or huge public shift"
+    ),
+]
 
 
-class CuratorState(AgentState[ResearchBrief]):
-    """LangGraph agent state accumulating Stories, bodies, comments, and output."""
+class Curator:
+    """Ranks daily candidate Stories via OpenRouter Jev and hydrates readable picks."""
 
-    stories: NotRequired[Annotated[dict[str, Story], operator.or_]]
-    contents: NotRequired[Annotated[dict[str, str], operator.or_]]
-    comments: NotRequired[Annotated[dict[str, list[str]], operator.or_]]
-    unreadable: NotRequired[Annotated[set[str], operator.or_]]
-    segments: NotRequired[list[Segment]]
-    curated_stories: NotRequired[list[CuratedStory]]
+    def __init__(
+        self,
+        *,
+        api_key: SecretStr,
+        fetcher: ContentFetcher,
+        model: str = "jev-1.14",
+        source: Source | None = None,
+        client: httpx.AsyncClient | None = None,
+    ) -> None:
+        """Configure Jev credentials, model, fetcher, and optional source/client."""
+        self.api_key = api_key
+        self.fetcher = fetcher
+        self.model = model
+        self.source = source
+        self.client = client
 
-
-@dynamic_prompt
-def _curator_prompt(request: ModelRequest[CuratorContext]) -> str:
-    """Render curation instructions for the Episode date."""
-    return _SYSTEM_TEMPLATE.format(
-        episode_date=request.runtime.context.episode_date.isoformat(),
-    )
-
-
-@after_agent(state_schema=CuratorState)
-def _finalize_curation(
-    state: CuratorState,
-    runtime: Runtime[CuratorContext],
-) -> dict[str, Any] | None:
-    """Validate ResearchBrief grounding and materialize CuratedStories in state."""
-    del runtime
-    brief = state.get("structured_response")
-    if brief is None:
-        return None
-    segments, curated_stories = brief.build_curated_stories(
-        stories=state.get("stories", {}),
-        contents=state.get("contents", {}),
-        comments=state.get("comments", {}),
-        unreadable=state.get("unreadable", set()),
-    )
-    return {"segments": segments, "curated_stories": curated_stories}
-
-
-@tool
-async def list_stories(
-    runtime: ToolRuntime[CuratorContext, CuratorState],
-    limit: int = 30,
-) -> Command[Any]:
-    """List top candidate tech news Stories with id, title, url, score."""
-    stories = await runtime.context.source.fetch_stories(limit)
-    payload = [
-        {
-            "id": story.id,
-            "title": story.title,
-            "url": story.url,
-            "score": story.score,
-            "comment_count": story.comment_count,
+    async def _rank_stories(
+        self,
+        *,
+        day: date,
+        stories: list[Story],
+        client: httpx.AsyncClient,
+    ) -> list[Story]:
+        """Rank candidate Stories in a single OpenRouter System One Jev call."""
+        state = {
+            "news_date": day.isoformat(),
+            "taste_profile": _TASTE_PROFILE,
+            "candidates": [
+                {
+                    "id": story.id,
+                    "title": story.title,
+                    "url": story.url,
+                    "score": story.score,
+                    "comments": story.comment_count,
+                }
+                for story in stories
+            ],
         }
-        for story in stories
-    ]
-    return Command(
-        update={
-            "stories": {story.id: story for story in stories},
-            "messages": [
-                ToolMessage(
-                    content=json.dumps(payload),
-                    tool_call_id=runtime.tool_call_id,
+        questions = {
+            story.id: {
+                "type": "score",
+                "instructions": (
+                    f"Rate story {story.id} ('{story.title}') against the Taste "
+                    "Profile and HN engagement (score + comments) relative to the "
+                    "other candidates."
                 ),
-            ],
-        },
-    )
-
-
-@tool
-async def fetch_story_content(
-    story_id: str,
-    runtime: ToolRuntime[CuratorContext, CuratorState],
-) -> Command[Any] | str:
-    """Extract readable Markdown content for a candidate story_id."""
-    story = runtime.state.get("stories", {}).get(story_id)
-    if story is None:
-        return f"Unknown story_id '{story_id}'. Call list_stories first."
-    if not story.url:
-        text = f"No external URL (self-post title: {story.title})."
-        return Command(
-            update={
-                "contents": {story_id: story.title},
-                "messages": [
-                    ToolMessage(
-                        content=text,
-                        tool_call_id=runtime.tool_call_id,
-                    ),
-                ],
+                "criteria": _SCORE_LEVELS,
+            }
+            for story in stories
+        }
+        response = await client.post(
+            _SYSTEM_ONE_URL,
+            headers={
+                "Authorization": f"Bearer {self.api_key.get_secret_value()}",
+                "Content-Type": "application/json",
             },
+            json={"model": self.model, "state": state, "questions": questions},
+            timeout=_REQUEST_TIMEOUT_SECONDS,
         )
-    content = await runtime.context.fetcher.fetch_content(story.url)
-    if content is None:
-        return Command(
-            update={
-                "unreadable": {story_id},
-                "messages": [
-                    ToolMessage(
-                        content="UNREADABLE",
-                        tool_call_id=runtime.tool_call_id,
+        response.raise_for_status()
+        payload: dict[str, Any] = response.json()
+        answers: dict[str, dict[str, Any]] = payload.get("answers") or {}
+        story_by_id = {story.id: story for story in stories}
+        scored = [
+            (story_by_id[sid], float(answer["score"]))
+            for sid, answer in answers.items()
+            if sid in story_by_id
+        ]
+        scored.sort(key=lambda item: item[1], reverse=True)
+        return [story for story, _ in scored]
+
+    async def curate(
+        self,
+        day: date,
+        *,
+        limit: int = 5,
+    ) -> tuple[list[Segment], list[CuratedStory]]:
+        """Rank `day`'s Stories with Jev and hydrate up to `limit` readable picks."""
+        ctx = (
+            nullcontext(self.client) if self.client is not None else httpx.AsyncClient()
+        )
+        async with ctx as active_client:
+            active_source = self.source or HackerNewsSource(client=active_client)
+            candidates = await active_source.fetch_stories(day, limit=30)
+            if not candidates:
+                msg = f"No candidate Stories returned for {day.isoformat()}."
+                raise RuntimeError(msg)
+
+            ranked = await self._rank_stories(
+                day=day,
+                stories=candidates,
+                client=active_client,
+            )
+
+            segments: list[Segment] = []
+            curated: list[CuratedStory] = []
+            for story in ranked:
+                if story.url:
+                    raw_content = await self.fetcher.fetch_content(
+                        story.url,
+                        title=story.title,
+                    )
+                    if raw_content is None:
+                        logger.info(
+                            "Skipping unreadable Story %s: %s",
+                            story.id,
+                            story.url,
+                        )
+                        continue
+                    content = raw_content[:MAX_CONTENT_CHARS]
+                else:
+                    content = story.title
+
+                comments = await active_source.fetch_comments(story.id)
+                segments.append(
+                    Segment(story_id=story.id, title=story.title, url=story.url),
+                )
+                curated.append(
+                    CuratedStory(
+                        title=story.title,
+                        url=story.url,
+                        content=content,
+                        comments=comments,
                     ),
-                ],
-            },
-        )
-    clipped = content[:MAX_CONTENT_CHARS]
-    return Command(
-        update={
-            "contents": {story_id: clipped},
-            "messages": [
-                ToolMessage(
-                    content=clipped,
-                    tool_call_id=runtime.tool_call_id,
-                ),
-            ],
-        },
-    )
+                )
+                if len(curated) >= limit:
+                    break
 
-
-@tool
-async def fetch_comments(
-    story_id: str,
-    runtime: ToolRuntime[CuratorContext, CuratorState],
-    limit: int = 15,
-) -> Command[Any]:
-    """Fetch top community comments for a shortlisted story_id."""
-    comments = await runtime.context.source.fetch_comments(story_id, limit)
-    return Command(
-        update={
-            "comments": {story_id: comments},
-            "messages": [
-                ToolMessage(
-                    content=json.dumps(comments),
-                    tool_call_id=runtime.tool_call_id,
-                ),
-            ],
-        },
-    )
-
-
-curator = create_agent(
-    model=chat_model,
-    tools=[list_stories, fetch_story_content, fetch_comments],
-    middleware=[_curator_prompt, cast("Any", _finalize_curation)],
-    state_schema=cast("type[AgentState[ResearchBrief]]", CuratorState),
-    context_schema=CuratorContext,
-    response_format=ToolStrategy(ResearchBrief),
-    name="curator",
-)
+        if not curated:
+            msg = f"No readable Stories found for {day.isoformat()}."
+            raise RuntimeError(msg)
+        return segments, curated

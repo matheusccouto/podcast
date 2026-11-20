@@ -1,8 +1,9 @@
-"""Hacker News upstream Source using the official Firebase JSON API."""
+"""Hacker News upstream Source using daily front pages and the Firebase JSON API."""
 
 import asyncio
 import re
 from contextlib import nullcontext
+from datetime import date
 from html import unescape
 from typing import Any
 
@@ -11,22 +12,26 @@ import httpx
 from podcast.models import Story
 
 _DEFAULT_BASE_URL = "https://hacker-news.firebaseio.com/v0"
+_DEFAULT_FRONT_URL = "https://news.ycombinator.com/front"
 _REQUEST_TIMEOUT_SECONDS = 15.0
 _MAX_CONCURRENCY = 10
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
+_FRONT_ITEM_ID_RE = re.compile(r'<tr[^>]*class="athing[^"]*"[^>]*id="(\d+)"')
 
 
 class HackerNewsSource:
-    """Collector for Hacker News top Stories and discussion comments."""
+    """Collector for Hacker News daily front-page Stories and comments."""
 
     def __init__(
         self,
         *,
         base_url: str = _DEFAULT_BASE_URL,
+        front_url: str = _DEFAULT_FRONT_URL,
         client: httpx.AsyncClient | None = None,
     ) -> None:
-        """Configure the Firebase API base URL and optional shared HTTP client."""
+        """Configure API/front-page URLs and optional shared HTTP client."""
         self.base_url = base_url.rstrip("/")
+        self.front_url = front_url.rstrip("/")
         self.client = client
 
     def _client_ctx(self) -> nullcontext[httpx.AsyncClient] | httpx.AsyncClient:
@@ -55,18 +60,21 @@ class HackerNewsSource:
 
         return await asyncio.gather(*(_get(item_id) for item_id in item_ids))
 
-    async def fetch_stories(self, limit: int = 30) -> list[Story]:
-        """Return top Hacker News Stories without fetching discussion comments."""
+    async def fetch_stories(self, day: date, limit: int = 30) -> list[Story]:
+        """Return Hacker News front-page Stories for `day` without comments."""
         if limit <= 0:
             return []
 
         async with self._client_ctx() as active_client:
             response = await active_client.get(
-                f"{self.base_url}/topstories.json",
+                self.front_url,
+                params={"day": day.isoformat()},
                 timeout=_REQUEST_TIMEOUT_SECONDS,
             )
             response.raise_for_status()
-            candidate_ids: list[int] = response.json()[: limit * 2]
+            candidate_ids = [
+                int(match) for match in _FRONT_ITEM_ID_RE.findall(response.text)
+            ][: limit * 2]
             entries = await self._fetch_items(active_client, candidate_ids)
 
         stories: list[Story] = []

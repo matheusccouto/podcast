@@ -6,7 +6,7 @@ Output language: {{ language }}
 {% endfor %}
 # Scriptwriting Instructions
 
-Write the finalized spoken dialogue in **{{ language }}** based strictly on the curated `Story` sources provided.
+Write the finalized spoken dialogue, Episode `title`, and concise `summary` in **{{ language }}** based strictly on the curated `Story` sources provided.
 
 ## Editorial Style
 - Conversational dialogue strictly between the two configured `Persona` speakers, inspired by tight daily explanatory audio journalism: curious, direct, warm, with light, grounded humor.

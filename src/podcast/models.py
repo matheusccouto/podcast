@@ -1,8 +1,6 @@
 """Zero-dependency domain models with self-contained Pydantic validation."""
 
 import re
-from collections.abc import Mapping
-from collections.abc import Set as AbstractSet
 from datetime import date
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -72,7 +70,6 @@ class Segment(_DomainModel):
     story_id: str = Field(min_length=1)
     title: str = Field(min_length=1)
     url: str | None = None
-    is_lead: bool = False
     key_facts: list[str] = Field(default_factory=list)
 
 
@@ -83,67 +80,7 @@ class CuratedStory(_DomainModel):
     url: str | None = None
     content: str
     comments: list[str] = Field(default_factory=list)
-    is_lead: bool = False
     key_facts: list[str] = Field(default_factory=list)
-
-
-class ResearchBrief(_DomainModel):
-    """Validated curation plan emitted by the Curator subagent."""
-
-    title: str = Field(min_length=1)
-    summary: str = Field(min_length=1)
-    segments: list[Segment] = Field(min_length=1, max_length=5)
-
-    @model_validator(mode="after")
-    def validate_segments(self) -> ResearchBrief:
-        """Ensure segment story_ids are unique and exactly one segment is lead."""
-        ids = [segment.story_id for segment in self.segments]
-        if len(ids) != len(set(ids)):
-            msg = "Duplicate story_id in curated segments."
-            raise ValueError(msg)
-        lead_count = sum(1 for segment in self.segments if segment.is_lead)
-        if lead_count != 1:
-            msg = f"Expected exactly 1 lead Segment, got {lead_count}."
-            raise ValueError(msg)
-        return self
-
-    def build_curated_stories(
-        self,
-        *,
-        stories: Mapping[str, Story],
-        contents: Mapping[str, str],
-        comments: Mapping[str, list[str]],
-        unreadable: AbstractSet[str],
-    ) -> tuple[list[Segment], list[CuratedStory]]:
-        """Validate grounding against fetched state and build CuratedStories."""
-        normalized: list[Segment] = []
-        curated: list[CuratedStory] = []
-        for segment in self.segments:
-            story = stories.get(segment.story_id)
-            if story is None:
-                msg = f"Curator selected unknown story_id '{segment.story_id}'."
-                raise ValueError(msg)
-            if segment.story_id in unreadable:
-                msg = f"Curator selected unreadable Story '{segment.story_id}'."
-                raise ValueError(msg)
-            if segment.story_id not in contents:
-                msg = (
-                    f"Curator selected Story '{segment.story_id}' without calling "
-                    "fetch_story_content first."
-                )
-                raise ValueError(msg)
-            normalized.append(segment.model_copy(update={"url": story.url}))
-            curated.append(
-                CuratedStory(
-                    title=segment.title,
-                    url=story.url,
-                    content=contents[segment.story_id],
-                    comments=comments.get(segment.story_id, []),
-                    is_lead=segment.is_lead,
-                    key_facts=segment.key_facts,
-                ),
-            )
-        return normalized, curated
 
 
 class SpeechTurn(_DomainModel):
@@ -193,6 +130,8 @@ class SpeechTurn(_DomainModel):
 class Dialogue(_DomainModel):
     """Validated two-Persona spoken dialogue emitted by the Writer subagent."""
 
+    title: str = Field(min_length=1)
+    summary: str = Field(min_length=1)
     turns: list[SpeechTurn] = Field(min_length=4)
 
     @property

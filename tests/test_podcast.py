@@ -1,15 +1,17 @@
-"""Tests for Pydantic validations and the LangGraph podcast_graph."""
+"""Tests for Pydantic validations, NDCG@k metric, and podcast_graph."""
 
+import json
 from datetime import date
 from pathlib import Path
 
 import pytest
-from pydantic import ValidationError
+from deepeval.test_case import LLMTestCase
 
+from evals.conftest import NDCGAtKMetric
 from podcast.agents import PodcastContext, PodcastState, llm_config, podcast_graph
 from podcast.feed import Feed
 from podcast.fetcher import ContentFetcher
-from podcast.models import ResearchBrief, Script, Segment, Story, SynthesizedAudio
+from podcast.models import Script, Story, SynthesizedAudio
 from podcast.settings import Settings
 from podcast.sources import Source
 
@@ -26,8 +28,9 @@ class InMemorySource:
         self._stories = stories
         self._comments = comments
 
-    async def fetch_stories(self, limit: int = 30) -> list[Story]:
-        """Return up to `limit` configured test Stories."""
+    async def fetch_stories(self, day: date, limit: int = 30) -> list[Story]:
+        """Return up to `limit` configured test Stories for `day`."""
+        del day
         return self._stories[:limit]
 
     async def fetch_comments(self, story_id: str, limit: int = 15) -> list[str]:
@@ -42,8 +45,14 @@ class InMemoryFetcher:
         """Store static URL-to-content mappings."""
         self._contents = contents
 
-    async def fetch_content(self, url: str) -> str | None:
+    async def fetch_content(
+        self,
+        url: str,
+        *,
+        title: str | None = None,
+    ) -> str | None:
         """Return preconfigured Markdown body or None for `url`."""
+        del title
         return self._contents.get(url)
 
 
@@ -123,21 +132,26 @@ def graph_settings(tmp_path: Path, live_settings: Settings) -> Settings:
 
 
 @pytest.mark.parametrize(
-    "segments",
+    ("predicted", "expected_score"),
     [
-        [Segment(story_id="1", title="One", is_lead=False)],
-        [
-            Segment(story_id="1", title="One", is_lead=True),
-            Segment(story_id="1", title="Duplicate", is_lead=False),
-        ],
+        (["a", "b", "c", "d", "e"], 1.0),
+        (["b", "c", "d", "e", "x"], 0.4677),
+        (["x", "y", "z"], 0.0),
     ],
 )
-def test_research_brief_enforces_single_lead_and_unique_ids(
-    segments: list[Segment],
+def test_ndcg_at_k_scores_exponential_ranking(
+    predicted: list[str],
+    expected_score: float,
 ) -> None:
-    """ResearchBrief rejects duplicate story_ids or missing/multiple lead flags."""
-    with pytest.raises(ValidationError):
-        ResearchBrief(title="Test", summary="Summary", segments=segments)
+    """NDCGAtKMetric computes exponential NDCG@5 and penalizes missing #1 lead."""
+    metric = NDCGAtKMetric(k=5, threshold=0.5)
+    case = LLMTestCase(
+        input="2026-11-19",
+        actual_output=json.dumps(predicted),
+        expected_output=json.dumps(["a", "b", "c", "d", "e"]),
+    )
+    score = metric.measure(case)
+    assert score == pytest.approx(expected_score, abs=1e-3)
 
 
 @pytest.mark.live
@@ -151,6 +165,8 @@ async def test_podcast_graph_curates_writes_and_publishes(
         PodcastState(episode_date=date(2026, 11, 15)),
         context=PodcastContext(
             personas=graph_settings.personas,
+            openrouter_api_key=graph_settings.openrouter_api_key,
+            curator_model=graph_settings.curator_model,
             language=graph_settings.podcast_language,
             source=sample_source,
             fetcher=sample_fetcher,

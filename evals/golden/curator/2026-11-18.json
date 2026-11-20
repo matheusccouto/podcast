@@ -1,0 +1,15 @@
+{
+  "date": "2026-11-18",
+  "ranking": [
+    "50552424", // Gemini 4 Neon
+    "50540178", // Google's AI answers reducing search traffic by 40%
+    "50547777", // AI agents ask better questions than KPMG accountants in audit trial
+    "50546914", // The Cambridge Dictionary has named ‘human’ as the Word of the Year 2026
+    "50541619", // Claude was trained on protein sequences at scale
+    "50549493", // Advancing chip design with OpenAI models
+    "50548021", // Seven new models at scalable price-performance
+    "50551046", // DaisyRose-27B
+    "50543989", // Energy-Based Reasoners: 385x more efficient inference
+    "50540472" // Cerebras Disaggregated Inference
+  ]
+}

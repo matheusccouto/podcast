@@ -1,10 +1,14 @@
 """Tests for HackerNewsSource Story and comment collection."""
 
+from datetime import date
+
 import httpx
 import pytest
 
 from podcast.models import Story
 from podcast.sources import HackerNewsSource
+
+_SAMPLE_DAY = date(2026, 11, 19)
 
 
 @pytest.fixture
@@ -14,9 +18,13 @@ def live_source() -> HackerNewsSource:
 
 
 async def test_hackernews_parses_stories_and_filters_dead_items() -> None:
-    """Offline Firebase payloads parse into Stories and skip dead/non-story items."""
+    """Offline front-page HTML + Firebase items parse into Stories and skip dead."""
+    front_html = (
+        '<tr class="athing submission" id="101"></tr>'
+        '<tr class="athing submission" id="102"></tr>'
+        '<tr class="athing submission" id="103"></tr>'
+    )
     payloads: dict[str, object] = {
-        "/v0/topstories.json": [101, 102, 103],
         "/v0/item/101.json": {
             "id": 101,
             "type": "story",
@@ -39,10 +47,16 @@ async def test_hackernews_parses_stories_and_filters_dead_items() -> None:
     }
 
     def _handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/front":
+            assert request.url.params["day"] == "2026-11-19"
+            return httpx.Response(200, text=front_html)
         return httpx.Response(200, json=payloads[request.url.path])
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(_handler)) as client:
-        stories = await HackerNewsSource(client=client).fetch_stories(limit=5)
+        stories = await HackerNewsSource(client=client).fetch_stories(
+            _SAMPLE_DAY,
+            limit=5,
+        )
 
     assert len(stories) == 1
     assert stories[0] == Story(
@@ -80,8 +94,8 @@ async def test_hackernews_strips_html_from_comments() -> None:
 async def test_hackernews_fetch_stories_returns_live_stories(
     live_source: HackerNewsSource,
 ) -> None:
-    """Fetching stories returns top Hacker News Story metadata cleanly."""
-    stories = await live_source.fetch_stories(limit=3)
+    """Fetching stories returns daily Hacker News Story metadata cleanly."""
+    stories = await live_source.fetch_stories(_SAMPLE_DAY, limit=3)
 
     assert len(stories) == 3
     for story in stories:
@@ -101,7 +115,7 @@ async def test_hackernews_fetch_comments_returns_plain_text_comments(
     live_source: HackerNewsSource,
 ) -> None:
     """Fetching comments returns non-empty HTML-stripped top-level comments."""
-    stories = await live_source.fetch_stories(limit=15)
+    stories = await live_source.fetch_stories(_SAMPLE_DAY, limit=15)
     commented_story = next(story for story in stories if story.comment_count >= 3)
 
     comments = await live_source.fetch_comments(commented_story.id, limit=3)
@@ -119,4 +133,4 @@ async def test_hackernews_raises_loudly_on_http_error() -> None:
     async with httpx.AsyncClient(transport=transport) as client:
         source = HackerNewsSource(client=client)
         with pytest.raises(httpx.HTTPStatusError):
-            await source.fetch_stories(limit=3)
+            await source.fetch_stories(_SAMPLE_DAY, limit=3)
