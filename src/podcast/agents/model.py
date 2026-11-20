@@ -1,11 +1,11 @@
 """Shared runtime-configurable OpenRouter chat model."""
 
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
 from langchain.chat_models import init_chat_model
-
-if TYPE_CHECKING:
-    from langchain_core.language_models import BaseChatModel
+from langchain_core.language_models import BaseChatModel
+from langchain_core.runnables import RunnableConfig
+from pydantic import SecretStr
 
 chat_model = cast(
     "BaseChatModel",
@@ -17,3 +17,13 @@ chat_model = cast(
         timeout=120_000,
     ),
 )
+
+
+def llm_config(*, model: str, api_key: SecretStr) -> RunnableConfig:
+    """Build a LangChain RunnableConfig binding runtime model and API key."""
+    return {
+        "configurable": {
+            "llm_model": model,
+            "llm_api_key": api_key.get_secret_value(),
+        },
+    }

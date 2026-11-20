@@ -10,6 +10,9 @@ import httpx
 
 from podcast.models import Story
 
+_DEFAULT_BASE_URL = "https://hacker-news.firebaseio.com/v0"
+_REQUEST_TIMEOUT_SECONDS = 15.0
+_MAX_CONCURRENCY = 10
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
 
 
@@ -19,18 +22,18 @@ class HackerNewsSource:
     def __init__(
         self,
         *,
-        base_url: str = "https://hacker-news.firebaseio.com/v0",
+        base_url: str = _DEFAULT_BASE_URL,
         client: httpx.AsyncClient | None = None,
     ) -> None:
-        """Configure the Firebase API base URL and optional HTTP client."""
+        """Configure the Firebase API base URL and optional shared HTTP client."""
         self.base_url = base_url.rstrip("/")
         self.client = client
 
     def _client_ctx(self) -> nullcontext[httpx.AsyncClient] | httpx.AsyncClient:
-        """Return an injectable or short-lived AsyncClient context."""
+        """Return the injected shared client or a short-lived AsyncClient."""
         if self.client is not None:
             return nullcontext(self.client)
-        return httpx.AsyncClient(timeout=15.0)
+        return httpx.AsyncClient()
 
     async def _fetch_items(
         self,
@@ -38,11 +41,14 @@ class HackerNewsSource:
         item_ids: list[int],
     ) -> list[dict[str, Any] | None]:
         """Fetch multiple Hacker News items concurrently under bounded concurrency."""
-        semaphore = asyncio.Semaphore(10)
+        semaphore = asyncio.Semaphore(_MAX_CONCURRENCY)
 
         async def _get(item_id: int) -> dict[str, Any] | None:
             async with semaphore:
-                response = await client.get(f"{self.base_url}/item/{item_id}.json")
+                response = await client.get(
+                    f"{self.base_url}/item/{item_id}.json",
+                    timeout=_REQUEST_TIMEOUT_SECONDS,
+                )
                 response.raise_for_status()
                 payload: dict[str, Any] | None = response.json()
                 return payload
@@ -55,7 +61,10 @@ class HackerNewsSource:
             return []
 
         async with self._client_ctx() as active_client:
-            response = await active_client.get(f"{self.base_url}/topstories.json")
+            response = await active_client.get(
+                f"{self.base_url}/topstories.json",
+                timeout=_REQUEST_TIMEOUT_SECONDS,
+            )
             response.raise_for_status()
             candidate_ids: list[int] = response.json()[: limit * 2]
             entries = await self._fetch_items(active_client, candidate_ids)

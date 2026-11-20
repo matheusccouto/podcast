@@ -40,6 +40,7 @@ Namespaces are one honking great idea -- let's do more of those!
 - https://openrouter.ai/fish-audio/s2.1-pro-free:free/llms.txt
 - https://docs.langchain.com/llms.txt
 - https://deepeval.com/llms.txt
+- https://pydantic.dev/docs/llms.txt
 - https://c4model.com/llms.txt
 
 ## Agent skills

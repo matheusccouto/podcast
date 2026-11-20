@@ -1,14 +1,11 @@
 """Zero-dependency domain models with self-contained Pydantic validation."""
 
 import re
+from collections.abc import Mapping
+from collections.abc import Set as AbstractSet
 from datetime import date
-from typing import TYPE_CHECKING
 
-from pydantic import BaseModel, Field, field_validator, model_validator
-
-if TYPE_CHECKING:
-    from collections.abc import Mapping
-    from collections.abc import Set as AbstractSet
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 MAX_CONTENT_CHARS = 40_000
 _MIN_TURN_WORDS = 3
@@ -33,7 +30,13 @@ def _spoken_words(text: str) -> list[str]:
     return _BRACKET_TAG_RE.sub("", text).split()
 
 
-class Persona(BaseModel):
+class _DomainModel(BaseModel):
+    """Base immutable value object with whitespace-stripped string fields."""
+
+    model_config = ConfigDict(frozen=True, str_strip_whitespace=True)
+
+
+class Persona(_DomainModel):
     """Speaker identity shared by Script generation and audio synthesis."""
 
     name: str
@@ -42,7 +45,16 @@ class Persona(BaseModel):
     voice_id: str
 
 
-class Story(BaseModel):
+def validate_persona_voices(personas: tuple[Persona, Persona]) -> set[str]:
+    """Validate and return the distinct, non-empty voice_id set for two Personas."""
+    valid_voices = {persona.voice_id for persona in personas}
+    if "" in valid_voices or len(valid_voices) != len(personas):
+        msg = "Both Personas require distinct, non-empty voice_id values."
+        raise ValueError(msg)
+    return valid_voices
+
+
+class Story(_DomainModel):
     """Raw candidate news Story collected from an upstream Source."""
 
     id: str
@@ -54,7 +66,7 @@ class Story(BaseModel):
     comment_count: int = 0
 
 
-class Segment(BaseModel):
+class Segment(_DomainModel):
     """Curated topic unit within an Episode referencing a verified Story."""
 
     story_id: str = Field(min_length=1)
@@ -64,7 +76,7 @@ class Segment(BaseModel):
     key_facts: list[str] = Field(default_factory=list)
 
 
-class CuratedStory(BaseModel):
+class CuratedStory(_DomainModel):
     """Readable Story material handed to the Writer subagent."""
 
     title: str
@@ -75,7 +87,7 @@ class CuratedStory(BaseModel):
     key_facts: list[str] = Field(default_factory=list)
 
 
-class ResearchBrief(BaseModel):
+class ResearchBrief(_DomainModel):
     """Validated curation plan emitted by the Curator subagent."""
 
     title: str = Field(min_length=1)
@@ -134,35 +146,24 @@ class ResearchBrief(BaseModel):
         return normalized, curated
 
 
-class SpeechTurn(BaseModel):
+class SpeechTurn(_DomainModel):
     """Single TTS turn matching OpenRouter Fish Audio SpeechTurn schema."""
 
-    voice: str
+    voice: str = Field(min_length=1)
     text: str
-
-    @field_validator("voice")
-    @classmethod
-    def validate_voice(cls, value: str) -> str:
-        """Require a non-empty speaker voice identifier."""
-        cleaned = value.strip()
-        if not cleaned:
-            msg = "SpeechTurn voice must be non-empty."
-            raise ValueError(msg)
-        return cleaned
 
     @field_validator("text")
     @classmethod
     def validate_tts_text(cls, value: str) -> str:
         """Validate spoken turn length, XML/paren exclusion, and [bracket] tags."""
-        cleaned = value.strip()
-        if _XML_TAG_RE.search(cleaned):
+        if _XML_TAG_RE.search(value):
             msg = "Contains forbidden XML/SSML tags."
             raise ValueError(msg)
-        if _PAREN_DIRECTION_RE.search(cleaned):
+        if _PAREN_DIRECTION_RE.search(value):
             msg = "Use [bracket] cues instead of (parenthesis) stage directions."
             raise ValueError(msg)
 
-        for match in _BRACKET_TAG_RE.finditer(cleaned):
+        for match in _BRACKET_TAG_RE.finditer(value):
             tag = match.group(1).strip()
             if (
                 not tag
@@ -175,7 +176,7 @@ class SpeechTurn(BaseModel):
                 )
                 raise ValueError(msg)
 
-        without_tags = _BRACKET_TAG_RE.sub("", cleaned)
+        without_tags = _BRACKET_TAG_RE.sub("", value)
         if "[" in without_tags or "]" in without_tags:
             msg = "Contains unbalanced or nested square brackets."
             raise ValueError(msg)
@@ -183,13 +184,13 @@ class SpeechTurn(BaseModel):
         if len(without_tags.split()) < _MIN_TURN_WORDS:
             msg = (
                 f"Turn must contain at least {_MIN_TURN_WORDS} spoken words "
-                "outside [bracket] tags so TTS language stays locked on pt-BR."
+                "outside [bracket] tags so TTS language detection stays stable."
             )
             raise ValueError(msg)
-        return cleaned
+        return value
 
 
-class Dialogue(BaseModel):
+class Dialogue(_DomainModel):
     """Validated two-Persona spoken dialogue emitted by the Writer subagent."""
 
     turns: list[SpeechTurn] = Field(min_length=4)
@@ -223,7 +224,7 @@ class Dialogue(BaseModel):
 
     def checked_turns(self, personas: tuple[Persona, Persona]) -> list[SpeechTurn]:
         """Validate every turn voice matches the configured Persona voice_ids."""
-        valid_voices = {persona.voice_id.strip() for persona in personas}
+        valid_voices = validate_persona_voices(personas)
         unknown_voices = {turn.voice for turn in self.turns} - valid_voices
         if unknown_voices:
             allowed = ", ".join(sorted(valid_voices))
@@ -233,7 +234,7 @@ class Dialogue(BaseModel):
         return self.turns
 
 
-class Script(BaseModel):
+class Script(_DomainModel):
     """Localized podcast Episode Script ready for synthesis and publishing."""
 
     published_at: date
@@ -244,14 +245,14 @@ class Script(BaseModel):
     turns: list[SpeechTurn] = Field(min_length=2)
 
 
-class SynthesizedAudio(BaseModel):
+class SynthesizedAudio(_DomainModel):
     """Pure value object containing encoded MP3 bytes and duration."""
 
     mp3_bytes: bytes
     duration_seconds: int
 
 
-class Episode(BaseModel):
+class Episode(_DomainModel):
     """Published podcast audio artifact and feed metadata."""
 
     published_at: date

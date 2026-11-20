@@ -3,22 +3,19 @@
 import asyncio
 import json
 from datetime import date
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
 import pytest
 from deepeval import assert_test
+from deepeval.dataset import Golden
+from deepeval.metrics import BaseMetric
 from deepeval.test_case import LLMTestCase
 
 from evals.conftest import load_golden_dataset
 from evals.download_golden import GoldenStory
-from podcast.agents import WriterContext, format_writer_prompt, writer
+from podcast.agents import WriterContext, format_writer_prompt, llm_config, writer
 from podcast.models import CuratedStory, Dialogue
-
-if TYPE_CHECKING:
-    from deepeval.dataset import Golden
-    from deepeval.metrics import BaseMetric
-
-    from podcast.settings import Settings
+from podcast.settings import Settings
 
 _DATASET = load_golden_dataset()
 if not _DATASET.goldens:
@@ -59,7 +56,10 @@ def test_scriptwriter_matches_indicator_quality_bar(
                 personas=eval_settings.personas,
                 language=eval_settings.podcast_language,
             ),
-            config=eval_settings.llm_config,
+            config=llm_config(
+                model=eval_settings.llm_model,
+                api_key=eval_settings.openrouter_api_key,
+            ),
         ),
     )
     dialogue: Dialogue = result["structured_response"]

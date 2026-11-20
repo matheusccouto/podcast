@@ -3,12 +3,12 @@ C4Component
 
     Container_Boundary(workflow, "src/podcast/agents/") {
         Component(graph, "Podcast Graph", "workflow.py", "StateGraph(PodcastState, PodcastContext): START -> curate -> write_script -> END")
-        Component(curator, "Curator Subagent", "curator/agent.py + instructions.md", "create_agent + CuratorContext + CuratorState + Jinja2 Taste Profile + @after_agent")
+        Component(curator, "Curator Subagent", "curator/agent.py + instructions.md", "create_agent + CuratorContext + CuratorState (operator.or_) + Jinja2 Taste Profile + @after_agent")
         Component(writer, "Writer Subagent", "writer/agent.py + instructions.md + prompt.md", "create_agent + WriterContext + Jinja2 templates + @after_agent voice check")
-        Component(model, "Configurable Chat Model", "model.py", "init_chat_model(openrouter, configurable_fields=(model, api_key))")
+        Component(model, "Configurable Chat Model", "model.py", "init_chat_model(openrouter, configurable_fields=(model, api_key)) + llm_config()")
     }
 
-    Component(sources, "Ingestion Tools Context", "HackerNewsSource & JinaFetcher", "Injected per run via PodcastContext -> CuratorContext")
+    Component(sources, "Ingestion Protocols", "Source & ContentFetcher", "Injected per run via PodcastContext -> CuratorContext")
     System_Ext(openrouter, "OpenRouter API", "LLM endpoint")
 
     Rel(graph, curator, "ainvoke(CuratorContext, recursion_limit=30)")

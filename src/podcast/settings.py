@@ -1,38 +1,62 @@
 """Application configuration and Persona definitions."""
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-from pydantic import SecretStr
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, SecretStr
+from pydantic_settings import BaseSettings, CliSuppress, SettingsConfigDict
 
 from podcast.models import Persona
 
-if TYPE_CHECKING:
-    from langchain_core.runnables import RunnableConfig
-
 
 class Settings(BaseSettings):
-    """Runtime settings loaded from environment variables or a local `.env` file."""
+    """Runtime settings loaded from environment variables, `.env`, or CLI flags."""
 
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        cli_kebab_case=True,
     )
 
-    openrouter_api_key: SecretStr
-    llm_model: str = "baidu/ernie-5.5-flash-preview:free"
-    tts_model: str = "fish-audio/s2.1-pro-free:free"
-    podcast_language: str = "pt-BR"
-    podcast_title: str = "HN Daily BR"
-    podcast_description: str = "Resumo diário de tecnologia e Hacker News."
-    podcast_author: str = "Matheus Couto"
-    podcast_base_url: str = "http://localhost:8000"
-    podcast_releases_base_url: str = "http://localhost:8000/episodes"
-    podcast_dist_dir: Path = Path("dist")
-    persona_a_voice_id: str = ""
-    persona_b_voice_id: str = ""
+    openrouter_api_key: CliSuppress[SecretStr]
+    llm_model: str = Field(
+        default="baidu/ernie-5.5-flash-preview:free",
+        description="OpenRouter LLM model ID.",
+    )
+    tts_model: str = Field(
+        default="fish-audio/s2.1-pro-free:free",
+        description="OpenRouter TTS model ID.",
+    )
+    podcast_language: str = Field(
+        default="pt-BR",
+        description="Target spoken Episode language (e.g. pt-BR).",
+    )
+    podcast_title: str = Field(
+        default="HN Daily BR",
+        description="RSS Feed title.",
+    )
+    podcast_description: str = Field(
+        default="Resumo diário de tecnologia e Hacker News.",
+        description="RSS Feed description.",
+    )
+    podcast_author: str = Field(
+        default="Matheus Couto",
+        description="RSS iTunes author name.",
+    )
+    podcast_base_url: str = Field(
+        default="http://localhost:8000",
+        description="Public base URL hosting feed.xml.",
+    )
+    podcast_releases_base_url: str = Field(
+        default="http://localhost:8000/episodes",
+        description="Public base URL hosting Episode MP3 assets.",
+    )
+    podcast_dist_dir: Path = Field(
+        default=Path("dist"),
+        description="Output directory for published RSS Feed and Episode files.",
+    )
+    persona_a_voice_id: CliSuppress[str] = ""
+    persona_b_voice_id: CliSuppress[str] = ""
 
     @property
     def personas(self) -> tuple[Persona, Persona]:
@@ -51,13 +75,3 @@ class Settings(BaseSettings):
                 voice_id=self.persona_b_voice_id,
             ),
         )
-
-    @property
-    def llm_config(self) -> RunnableConfig:
-        """Return configurable LangChain RunnableConfig for runtime LLM binding."""
-        return {
-            "configurable": {
-                "llm_model": self.llm_model,
-                "llm_api_key": self.openrouter_api_key.get_secret_value(),
-            },
-        }

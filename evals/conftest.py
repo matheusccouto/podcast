@@ -3,11 +3,12 @@
 import json
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import Annotated, Literal
 
 import httpx
 import pytest
 from deepeval.dataset import EvaluationDataset, Golden
+from deepeval.metrics import BaseMetric
 from deepeval.metrics.jev_eval import JevEval, Noul, Score
 from deepeval.models import DeepEvalBaseSystemOneModel
 from deepeval.models.system_one.schema import (
@@ -18,22 +19,62 @@ from deepeval.models.system_one.schema import (
     ScoreAnswer,
     ScoreQuestion,
     SystemOneAnswers,
+    SystemOneQuestion,
 )
 from deepeval.test_case import SingleTurnParams
-from pydantic import ValidationError
+from pydantic import BaseModel, Field, SecretStr, ValidationError
 
 from evals.download_golden import GoldenCase
 from podcast.models import MAX_CONTENT_CHARS
 from podcast.settings import Settings
 
-if TYPE_CHECKING:
-    from deepeval.metrics import BaseMetric
-    from deepeval.models.system_one.schema import SystemOneQuestion
-    from pydantic import SecretStr
-
 _GOLDEN_DIR = Path(__file__).parent / "golden"
 _SYSTEM_ONE_URL = "https://openrouter.ai/api/v1/systemone"
 _DEFAULT_JEV_MODEL = "jev-1.13"
+
+
+class _NoulPayload(BaseModel):
+    """OpenRouter System One noul probability answer payload."""
+
+    type: Literal["noul"]
+    noul: float
+
+
+class _ChoicePayload(BaseModel):
+    """OpenRouter System One categorical choice answer payload."""
+
+    type: Literal["choice"]
+    choice: str
+    probabilities: dict[str, float]
+    confidence: float
+
+
+class _ScorePayload(BaseModel):
+    """OpenRouter System One ordinal score answer payload."""
+
+    type: Literal["score"]
+    score: float
+    probabilities: dict[int, float]
+    confidence: float
+
+
+type _AnswerPayload = Annotated[
+    _NoulPayload | _ChoicePayload | _ScorePayload,
+    Field(discriminator="type"),
+]
+
+
+class _UsagePayload(BaseModel):
+    """Optional usage/cost block returned by OpenRouter System One."""
+
+    cost: float | None = None
+
+
+class _SystemOneResponse(BaseModel):
+    """Validated JSON response returned by OpenRouter's System One endpoint."""
+
+    answers: dict[str, _AnswerPayload] = Field(default_factory=dict)
+    usage: _UsagePayload = Field(default_factory=_UsagePayload)
 
 
 class OpenRouterJevModel(DeepEvalBaseSystemOneModel):
@@ -97,37 +138,24 @@ class OpenRouterJevModel(DeepEvalBaseSystemOneModel):
         payload: dict[str, object],
     ) -> tuple[SystemOneAnswers, float | None]:
         """Parse OpenRouter System One JSON answers and optional USD cost."""
+        parsed = _SystemOneResponse.model_validate(payload)
         answers = SystemOneAnswers()
-        raw_answers = cast("dict[str, dict[str, object]]", payload.get("answers", {}))
-
-        for key, item in raw_answers.items():
-            qtype = item.get("type")
-            if qtype == "noul":
-                answers.nouls[key] = NoulAnswer(
-                    probability=float(cast("float", item["noul"])),
-                )
-            elif qtype == "choice":
-                probs = cast("dict[str, float]", item["probabilities"])
+        for key, item in parsed.answers.items():
+            if isinstance(item, _NoulPayload):
+                answers.nouls[key] = NoulAnswer(probability=item.noul)
+            elif isinstance(item, _ChoicePayload):
                 answers.choices[key] = ChoiceAnswer(
-                    choice=str(item["choice"]),
-                    probabilities={str(k): float(v) for k, v in probs.items()},
-                    confidence=float(cast("float", item["confidence"])),
-                )
-            elif qtype == "score":
-                probs_int = cast("dict[str, float]", item["probabilities"])
-                answers.scores[key] = ScoreAnswer(
-                    score=float(cast("float", item["score"])),
-                    probabilities={int(k): float(v) for k, v in probs_int.items()},
-                    confidence=float(cast("float", item["confidence"])),
+                    choice=item.choice,
+                    probabilities=item.probabilities,
+                    confidence=item.confidence,
                 )
             else:
-                msg = f"Unsupported System One answer type: {qtype!r}"
-                raise TypeError(msg)
-
-        usage = cast("dict[str, object]", payload.get("usage", {}))
-        raw_cost = usage.get("cost")
-        cost = float(raw_cost) if isinstance(raw_cost, int | float) else None
-        return answers, cost
+                answers.scores[key] = ScoreAnswer(
+                    score=item.score,
+                    probabilities=item.probabilities,
+                    confidence=item.confidence,
+                )
+        return answers, parsed.usage.cost
 
     def _request_payload(
         self,

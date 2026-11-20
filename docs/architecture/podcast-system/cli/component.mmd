@@ -8,11 +8,11 @@ C4Component
     }
 
     Container_Boundary(cli, "Podcast CLI (src/podcast/)") {
-        Component(entry, "CLI Entrypoint", "__main__.py, settings.py, models.py", "Loads Settings, Persona definitions & domain models")
-        Component(ingestion, "Ingestion Adapters", "sources/hackernews.py, fetcher.py", "HackerNewsSource & JinaFetcher async httpx clients")
+        Component(entry, "CLI Entrypoint", "__main__.py, settings.py, models.py", "Pydantic Settings CliApp, shared httpx.AsyncClient & frozen domain models")
+        Component(ingestion, "Ingestion Adapters", "sources/, fetcher.py", "Source & ContentFetcher protocols (HackerNewsSource, JinaFetcher)")
         Component(agents, "Editorial Workflow", "agents/ (LangGraph + LangChain)", "Module-level podcast_graph orchestrating curator & writer")
-        Component(tts, "Audio Synthesizer", "tts.py", "OpenRouterTTS + upfront ffmpeg loudnorm MP3 encoding")
-        Component(publishing, "Feed Publisher", "feed.py", "Feed.from_settings writes Episode JSON/MP3 & feed.xml")
+        Component(tts, "Audio Synthesizer", "tts.py", "OpenRouterTTS (_request_pcm + _encode_mp3) via ffmpeg loudnorm")
+        Component(publishing, "Feed Publisher", "feed.py, feed.xml.j2", "Feed.from_settings renders Jinja2 RSS & writes Episode JSON/MP3")
     }
 
     Boundary(hosting, "GitHub & CI Hosting") {

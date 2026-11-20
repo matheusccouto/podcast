@@ -13,6 +13,70 @@ def live_source() -> HackerNewsSource:
     return HackerNewsSource()
 
 
+async def test_hackernews_parses_stories_and_filters_dead_items() -> None:
+    """Offline Firebase payloads parse into Stories and skip dead/non-story items."""
+    payloads: dict[str, object] = {
+        "/v0/topstories.json": [101, 102, 103],
+        "/v0/item/101.json": {
+            "id": 101,
+            "type": "story",
+            "title": "Zero-Copy Ring Buffers",
+            "url": "https://example.com/ringbuf",
+            "score": 420,
+            "descendants": 88,
+        },
+        "/v0/item/102.json": {
+            "id": 102,
+            "type": "story",
+            "title": "Dead Story",
+            "dead": True,
+        },
+        "/v0/item/103.json": {
+            "id": 103,
+            "type": "job",
+            "title": "Hiring Engineers",
+        },
+    }
+
+    def _handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=payloads[request.url.path])
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(_handler)) as client:
+        stories = await HackerNewsSource(client=client).fetch_stories(limit=5)
+
+    assert len(stories) == 1
+    assert stories[0] == Story(
+        id="101",
+        source="hackernews",
+        title="Zero-Copy Ring Buffers",
+        url="https://example.com/ringbuf",
+        discussion_url="https://news.ycombinator.com/item?id=101",
+        score=420,
+        comment_count=88,
+    )
+
+
+async def test_hackernews_strips_html_from_comments() -> None:
+    """Offline comment payloads strip HTML tags and unescape HTML entities."""
+    payloads: dict[str, object] = {
+        "/v0/item/101.json": {"id": 101, "kids": [201, 202]},
+        "/v0/item/201.json": {
+            "id": 201,
+            "text": "Latency &amp; throughput.<p>Second <i>line</i>.",
+        },
+        "/v0/item/202.json": {"id": 202, "deleted": True, "text": "gone"},
+    }
+
+    def _handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=payloads[request.url.path])
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(_handler)) as client:
+        comments = await HackerNewsSource(client=client).fetch_comments("101", limit=5)
+
+    assert comments == ["Latency & throughput.\nSecond line."]
+
+
+@pytest.mark.live
 async def test_hackernews_fetch_stories_returns_live_stories(
     live_source: HackerNewsSource,
 ) -> None:
@@ -32,6 +96,7 @@ async def test_hackernews_fetch_stories_returns_live_stories(
         assert story.comment_count >= 0
 
 
+@pytest.mark.live
 async def test_hackernews_fetch_comments_returns_plain_text_comments(
     live_source: HackerNewsSource,
 ) -> None:

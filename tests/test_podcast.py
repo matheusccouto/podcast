@@ -1,25 +1,21 @@
 """Tests for Pydantic validations and the LangGraph podcast_graph."""
 
 from datetime import date
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
-from podcast.agents import PodcastContext, PodcastState, podcast_graph
+from podcast.agents import PodcastContext, PodcastState, llm_config, podcast_graph
 from podcast.feed import Feed
-from podcast.fetcher import JinaFetcher
+from podcast.fetcher import ContentFetcher
 from podcast.models import ResearchBrief, Script, Segment, Story, SynthesizedAudio
-from podcast.sources import HackerNewsSource
-
-if TYPE_CHECKING:
-    from pathlib import Path
-
-    from podcast.settings import Settings
+from podcast.settings import Settings
+from podcast.sources import Source
 
 
-class InMemorySource(HackerNewsSource):
-    """In-memory HackerNewsSource returning controlled test Stories and comments."""
+class InMemorySource:
+    """In-memory Source returning controlled test Stories and comments."""
 
     def __init__(
         self,
@@ -27,7 +23,6 @@ class InMemorySource(HackerNewsSource):
         comments: dict[str, list[str]],
     ) -> None:
         """Store static test Stories and comment lists."""
-        super().__init__()
         self._stories = stories
         self._comments = comments
 
@@ -40,12 +35,11 @@ class InMemorySource(HackerNewsSource):
         return self._comments.get(story_id, [])[:limit]
 
 
-class InMemoryFetcher(JinaFetcher):
-    """In-memory JinaFetcher returning controlled readable or unreadable bodies."""
+class InMemoryFetcher:
+    """In-memory ContentFetcher returning controlled readable or unreadable bodies."""
 
     def __init__(self, contents: dict[str, str | None]) -> None:
         """Store static URL-to-content mappings."""
-        super().__init__()
         self._contents = contents
 
     async def fetch_content(self, url: str) -> str | None:
@@ -54,8 +48,8 @@ class InMemoryFetcher(JinaFetcher):
 
 
 @pytest.fixture
-def sample_source() -> HackerNewsSource:
-    """Provide an in-memory HackerNewsSource with two readable and one bad Story."""
+def sample_source() -> Source:
+    """Provide an in-memory Source with two readable and one bad Story."""
     stories = [
         Story(
             id="9002",
@@ -98,8 +92,8 @@ def sample_source() -> HackerNewsSource:
 
 
 @pytest.fixture
-def sample_fetcher() -> JinaFetcher:
-    """Provide an in-memory JinaFetcher matching sample_source URLs."""
+def sample_fetcher() -> ContentFetcher:
+    """Provide an in-memory ContentFetcher matching sample_source URLs."""
     contents: dict[str, str | None] = {
         "https://example.com/rust-ringbuf": (
             "A detailed engineering story explaining how io_uring and lock-free "
@@ -146,10 +140,11 @@ def test_research_brief_enforces_single_lead_and_unique_ids(
         ResearchBrief(title="Test", summary="Summary", segments=segments)
 
 
+@pytest.mark.live
 async def test_podcast_graph_curates_writes_and_publishes(
     graph_settings: Settings,
-    sample_source: HackerNewsSource,
-    sample_fetcher: JinaFetcher,
+    sample_source: Source,
+    sample_fetcher: ContentFetcher,
 ) -> None:
     """LangGraph workflow curates readable Stories, writes turns, and publishes."""
     result = await podcast_graph.ainvoke(
@@ -160,7 +155,10 @@ async def test_podcast_graph_curates_writes_and_publishes(
             source=sample_source,
             fetcher=sample_fetcher,
         ),
-        config=graph_settings.llm_config,
+        config=llm_config(
+            model=graph_settings.llm_model,
+            api_key=graph_settings.openrouter_api_key,
+        ),
     )
     script: Script = result["script"]
 

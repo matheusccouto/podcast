@@ -1,18 +1,18 @@
 C4Dynamic
     title Dynamic Flow — Daily Episode Run
 
-    Component(cli, "Podcast CLI", "__main__.py")
+    Component(cli, "Podcast CLI", "__main__.py (CliApp)")
     Component(graph, "podcast_graph", "agents/workflow.py")
     Component(curator, "curator", "agents/curator/")
     Component(ingestion, "Ingestion", "sources/, fetcher.py")
     Component(writer, "writer", "agents/writer/")
     Component(tts, "OpenRouterTTS", "tts.py + ffmpeg")
-    Component(feed, "Feed", "feed.py")
+    Component(feed, "Feed", "feed.py + feed.xml.j2")
     Container(releases, "GitHub Releases", "MP3 assets")
     Container(pages, "GitHub Pages", "feed.xml & episodes/*.json")
     System_Ext(player, "Podcast App", "RSS subscriber")
 
-    Rel(cli, graph, "1. ainvoke(PodcastState, PodcastContext, config)")
+    Rel(cli, graph, "1. Share httpx.AsyncClient & ainvoke(PodcastState, PodcastContext, llm_config)")
     Rel(graph, curator, "2. Run Curator subagent")
     Rel(curator, ingestion, "3. Fetch HN Stories, Markdown & comments")
     Rel(curator, graph, "4. Return validated ResearchBrief & CuratedStories")

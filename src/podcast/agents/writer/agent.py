@@ -1,22 +1,24 @@
 """Writer subagent defined directly at module level with Jinja2 templates."""
 
+from collections.abc import Sequence
+from dataclasses import dataclass
+from datetime import date
 from importlib import resources
-from typing import TYPE_CHECKING
 
 from langchain.agents import AgentState, create_agent
 from langchain.agents.middleware import ModelRequest, after_agent, dynamic_prompt
 from langchain.agents.structured_output import ToolStrategy
 from langchain_core.prompts import PromptTemplate
-from pydantic import BaseModel, field_validator
+from langgraph.runtime import Runtime
 
 from podcast.agents.model import chat_model
-from podcast.models import MAX_CONTENT_CHARS, CuratedStory, Dialogue, Persona
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
-    from datetime import date
-
-    from langgraph.runtime import Runtime
+from podcast.models import (
+    MAX_CONTENT_CHARS,
+    CuratedStory,
+    Dialogue,
+    Persona,
+    validate_persona_voices,
+)
 
 _SYSTEM_TEMPLATE = PromptTemplate.from_template(
     resources.files(__package__).joinpath("instructions.md").read_text("utf-8"),
@@ -28,24 +30,16 @@ _USER_TEMPLATE = PromptTemplate.from_template(
 )
 
 
-class WriterContext(BaseModel):
+@dataclass(frozen=True, slots=True)
+class WriterContext:
     """Per-invocation runtime context injected into the Writer subagent."""
 
     personas: tuple[Persona, Persona]
     language: str = "pt-BR"
 
-    @field_validator("personas")
-    @classmethod
-    def validate_distinct_voices(
-        cls,
-        personas: tuple[Persona, Persona],
-    ) -> tuple[Persona, Persona]:
-        """Require non-empty, distinct voice_id values for both Personas."""
-        valid_voices = {persona.voice_id.strip() for persona in personas}
-        if "" in valid_voices or len(valid_voices) != len(personas):
-            msg = "Both Personas require distinct, non-empty voice_id values."
-            raise ValueError(msg)
-        return personas
+    def __post_init__(self) -> None:
+        """Require distinct, non-empty voice_id values for both Personas."""
+        validate_persona_voices(self.personas)
 
 
 def format_writer_prompt(

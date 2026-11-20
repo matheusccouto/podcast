@@ -1,41 +1,36 @@
-"""Tests for the Click CLI entrypoint in podcast.__main__."""
+"""Tests for the Pydantic Settings CliApp entrypoint in podcast.__main__."""
 
 from datetime import date
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import pytest
-from click.testing import CliRunner
+from pydantic_settings import CliApp
 
 import podcast.__main__ as cli_module
 from podcast.models import Episode
-
-if TYPE_CHECKING:
-    from pathlib import Path
-
-    from podcast.settings import Settings
+from podcast.settings import Settings
 
 
-@pytest.fixture
-def runner() -> CliRunner:
-    """Provide a Click CliRunner for isolated CLI testing."""
-    return CliRunner()
+def test_cli_help_lists_options_and_hides_secrets(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Running `podcast --help` documents CLI options and suppresses secret flags."""
+    with pytest.raises(SystemExit) as exc_info:
+        CliApp.run(cli_module.PodcastCLI, cli_args=["--help"])
 
-
-def test_cli_help_lists_options(runner: CliRunner) -> None:
-    """Running `podcast --help` exits cleanly and documents CLI options."""
-    result = runner.invoke(cli_module.main, ["--help"])
-
-    assert result.exit_code == 0
-    assert "--date" in result.output
-    assert "--llm-model" in result.output
-    assert "--tts-model" in result.output
-    assert "--language" in result.output
-    assert "--dist-dir" in result.output
+    assert exc_info.value.code == 0
+    output = capsys.readouterr().out
+    assert "--episode-date" in output
+    assert "--llm-model" in output
+    assert "--tts-model" in output
+    assert "--podcast-language" in output
+    assert "--podcast-dist-dir" in output
+    assert "--openrouter-api-key" not in output
 
 
 def test_cli_applies_option_overrides(
-    runner: CliRunner,
     monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
 ) -> None:
     """CLI flags override Settings fields and pass parsed date into run_daily."""
@@ -64,24 +59,24 @@ def test_cli_applies_option_overrides(
     monkeypatch.setattr(cli_module, "run_daily", _fake_run_daily)
     dist_dir = tmp_path / "out"
 
-    result = runner.invoke(
-        cli_module.main,
-        [
-            "--date",
+    CliApp.run(
+        cli_module.PodcastCLI,
+        cli_args=[
+            "--episode-date",
             "2026-11-15",
             "--llm-model",
             "custom/llm:free",
             "--tts-model",
             "custom/tts:free",
-            "--language",
+            "--podcast-language",
             "en-US",
-            "--dist-dir",
+            "--podcast-dist-dir",
             str(dist_dir),
         ],
     )
 
-    assert result.exit_code == 0
-    assert "Published 2026-11-15 (120s, 4096 bytes): Test Episode" in result.output
+    output = capsys.readouterr().out
+    assert "Published 2026-11-15 (120s, 4096 bytes): Test Episode" in output
     invoked_settings = captured["settings"]
     assert captured["today"] == date(2026, 11, 15)
     assert getattr(invoked_settings, "llm_model", None) == "custom/llm:free"

@@ -1,18 +1,13 @@
 """Tests for RSS 2.0 Feed publishing."""
 
+from collections.abc import Callable
 from datetime import date
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import pytest
 
 from podcast.feed import Feed
-from podcast.models import Script, Segment, SynthesizedAudio
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
-    from pathlib import Path
-
-    from podcast.models import SpeechTurn
+from podcast.models import Script, Segment, SpeechTurn, SynthesizedAudio
 
 
 @pytest.fixture
@@ -67,7 +62,7 @@ def test_feed_publish_writes_artifacts_and_orders_rss_newest_first(
         SynthesizedAudio(mp3_bytes=b"ID3day1audio", duration_seconds=310),
     )
     ep2 = feed.publish(
-        make_script(date(2026, 11, 15), "Dia Dois"),
+        make_script(date(2026, 11, 15), "Dia Dois & Kernel"),
         SynthesizedAudio(mp3_bytes=b"ID3day2audio", duration_seconds=420),
     )
 
@@ -82,6 +77,7 @@ def test_feed_publish_writes_artifacts_and_orders_rss_newest_first(
 
     rss_xml = (dist_dir / "feed.xml").read_text(encoding="utf-8")
     assert "<title>HN Daily BR</title>" in rss_xml
+    assert "<title>Dia Dois &amp; Kernel</title>" in rss_xml
     assert "<itunes:author>Matheus Couto</itunes:author>" in rss_xml
     assert 'type="audio/mpeg"' in rss_xml
-    assert rss_xml.index("Dia Dois") < rss_xml.index("Dia Um")
+    assert rss_xml.index("Dia Dois &amp; Kernel") < rss_xml.index("Dia Um")

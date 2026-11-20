@@ -1,22 +1,39 @@
 """RSS 2.0 Feed publishing for Episode audio and metadata."""
 
+import logging
+from dataclasses import dataclass
 from datetime import UTC, datetime, time
 from email.utils import format_datetime
+from importlib import resources
 from pathlib import Path
-from typing import TYPE_CHECKING
-from xml.sax.saxutils import escape
 
-from pydantic import BaseModel
+from jinja2 import Environment
+from pydantic import BaseModel, ConfigDict
 
-from podcast.models import Episode
+from podcast.models import Episode, Script, SynthesizedAudio
+from podcast.settings import Settings
 
-if TYPE_CHECKING:
-    from podcast.models import Script, SynthesizedAudio
-    from podcast.settings import Settings
+logger = logging.getLogger(__name__)
+
+_PUBLISH_TIME_UTC = time(hour=9, tzinfo=UTC)
+_RSS_TEMPLATE = Environment(autoescape=True, keep_trailing_newline=True).from_string(
+    resources.files(__package__).joinpath("feed.xml.j2").read_text("utf-8"),
+)
+
+
+@dataclass(frozen=True, slots=True)
+class _FeedItem:
+    """View model pairing an Episode with its formatted RSS guid and pubDate."""
+
+    episode: Episode
+    guid: str
+    pub_date: str
 
 
 class Feed(BaseModel):
     """RSS 2.0 Feed metadata and local distribution publisher."""
+
+    model_config = ConfigDict(frozen=True, str_strip_whitespace=True)
 
     title: str
     description: str
@@ -67,57 +84,27 @@ class Feed(BaseModel):
         ]
         episodes.sort(key=lambda entry: entry.published_at, reverse=True)
 
-        (self.dist_dir / "feed.xml").write_text(
-            self._render_rss(episodes),
-            encoding="utf-8",
-        )
+        feed_path = self.dist_dir / "feed.xml"
+        feed_path.write_text(self._render_rss(episodes), encoding="utf-8")
+        logger.info("Published %s (%d episodes in %s)", slug, len(episodes), feed_path)
         return episode
 
     def _render_rss(self, episodes: list[Episode]) -> str:
         """Render an iTunes-compatible RSS 2.0 XML document ordered newest-first."""
         base_url = self.base_url.rstrip("/")
-        feed_url = f"{base_url}/feed.xml"
-        lines = [
-            '<?xml version="1.0" encoding="UTF-8"?>',
-            (
-                '<rss version="2.0" '
-                'xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" '
-                'xmlns:atom="http://www.w3.org/2005/Atom">'
-            ),
-            "  <channel>",
-            f"    <title>{escape(self.title)}</title>",
-            f"    <link>{escape(self.base_url)}</link>",
-            f"    <description>{escape(self.description)}</description>",
-            f"    <language>{escape(self.language)}</language>",
-            f"    <itunes:author>{escape(self.author)}</itunes:author>",
-            "    <itunes:explicit>false</itunes:explicit>",
-            (
-                f'    <atom:link href="{escape(feed_url)}" '
-                'rel="self" type="application/rss+xml" />'
-            ),
-        ]
-        for episode in episodes:
-            guid = f"{base_url}/episodes/{episode.published_at.isoformat()}"
-            pub_dt = datetime.combine(episode.published_at, time(hour=9, tzinfo=UTC))
-            pub_date = format_datetime(pub_dt, usegmt=True)
-            lines.extend(
-                [
-                    "    <item>",
-                    f"      <title>{escape(episode.title)}</title>",
-                    f'      <guid isPermaLink="false">{escape(guid)}</guid>',
-                    f"      <pubDate>{pub_date}</pubDate>",
-                    f"      <description>{escape(episode.summary)}</description>",
-                    (
-                        f'      <enclosure url="{escape(episode.audio_url)}" '
-                        f'length="{episode.byte_length}" type="audio/mpeg" />'
-                    ),
-                    (
-                        "      <itunes:duration>"
-                        f"{episode.duration_seconds}"
-                        "</itunes:duration>"
-                    ),
-                    "    </item>",
-                ],
+        items = [
+            _FeedItem(
+                episode=episode,
+                guid=f"{base_url}/episodes/{episode.published_at.isoformat()}",
+                pub_date=format_datetime(
+                    datetime.combine(episode.published_at, _PUBLISH_TIME_UTC),
+                    usegmt=True,
+                ),
             )
-        lines.extend(["  </channel>", "</rss>", ""])
-        return "\n".join(lines)
+            for episode in episodes
+        ]
+        return _RSS_TEMPLATE.render(
+            feed=self,
+            feed_url=f"{base_url}/feed.xml",
+            items=items,
+        )

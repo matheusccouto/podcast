@@ -12,6 +12,7 @@ def live_fetcher() -> JinaFetcher:
     return JinaFetcher()
 
 
+@pytest.mark.live
 async def test_fetch_content_returns_markdown_for_readable_url(
     live_fetcher: JinaFetcher,
 ) -> None:

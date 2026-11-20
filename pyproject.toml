@@ -9,7 +9,6 @@ authors = [
 ]
 requires-python = ">=3.14"
 dependencies = [
-    "click>=8.1.0",
     "httpx>=0.28.1",
     "jinja2>=3.1.0",
     "langchain>=1.0.0",
@@ -34,12 +33,9 @@ ignore = [
     "COM812",  # Incompatible with ruff format
     "ISC001",  # Incompatible with ruff format
     "CPY001",  # Missing copyright notice
-]
-
-[tool.ruff.lint.flake8-type-checking]
-runtime-evaluated-base-classes = [
-    "pydantic.BaseModel",
-    "pydantic_settings.BaseSettings",
+    "TC001",  # Python 3.14 defers annotations natively (PEP 649)
+    "TC002",  # Python 3.14 defers annotations natively (PEP 649)
+    "TC003",  # Python 3.14 defers annotations natively (PEP 649)
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -56,6 +52,10 @@ runtime-evaluated-base-classes = [
 testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+addopts = "-m 'not live'"
+markers = [
+    "live: tests that call external network, LLM, or TTS APIs",
+]
 
 [dependency-groups]
 dev = [

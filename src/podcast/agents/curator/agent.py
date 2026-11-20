@@ -1,9 +1,11 @@
 """Curator subagent defined directly at module level with LangChain runtime context."""
 
 import json
+import operator
+from dataclasses import dataclass
 from datetime import date
 from importlib import resources
-from typing import TYPE_CHECKING, Annotated, Any, NotRequired, cast
+from typing import Annotated, Any, NotRequired, cast
 
 from langchain.agents import AgentState, create_agent
 from langchain.agents.middleware import ModelRequest, after_agent, dynamic_prompt
@@ -11,11 +13,11 @@ from langchain.agents.structured_output import ToolStrategy
 from langchain.tools import ToolRuntime, tool
 from langchain_core.messages import ToolMessage
 from langchain_core.prompts import PromptTemplate
+from langgraph.runtime import Runtime
 from langgraph.types import Command
-from pydantic import BaseModel, ConfigDict, Field
 
 from podcast.agents.model import chat_model
-from podcast.fetcher import JinaFetcher
+from podcast.fetcher import ContentFetcher
 from podcast.models import (
     MAX_CONTENT_CHARS,
     CuratedStory,
@@ -23,10 +25,7 @@ from podcast.models import (
     Segment,
     Story,
 )
-from podcast.sources import HackerNewsSource
-
-if TYPE_CHECKING:
-    from langgraph.runtime import Runtime
+from podcast.sources import Source
 
 _SYSTEM_TEMPLATE = PromptTemplate.from_template(
     resources.files(__package__).joinpath("instructions.md").read_text("utf-8"),
@@ -34,36 +33,22 @@ _SYSTEM_TEMPLATE = PromptTemplate.from_template(
 )
 
 
-def _merge_dicts(
-    left: dict[str, Any] | None,
-    right: dict[str, Any] | None,
-) -> dict[str, Any]:
-    """Merge dictionary updates inside CuratorState channels."""
-    return {**(left or {}), **(right or {})}
-
-
-def _merge_sets(left: set[str] | None, right: set[str] | None) -> set[str]:
-    """Union set updates inside CuratorState channels."""
-    return (left or set()) | (right or set())
-
-
-class CuratorContext(BaseModel):
+@dataclass(frozen=True, slots=True)
+class CuratorContext:
     """Per-invocation runtime dependencies injected into the Curator subagent."""
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
     episode_date: date
-    source: HackerNewsSource = Field(default_factory=HackerNewsSource)
-    fetcher: JinaFetcher = Field(default_factory=JinaFetcher)
+    source: Source
+    fetcher: ContentFetcher
 
 
 class CuratorState(AgentState[ResearchBrief]):
     """LangGraph agent state accumulating Stories, bodies, comments, and output."""
 
-    stories: NotRequired[Annotated[dict[str, Story], _merge_dicts]]
-    contents: NotRequired[Annotated[dict[str, str], _merge_dicts]]
-    comments: NotRequired[Annotated[dict[str, list[str]], _merge_dicts]]
-    unreadable: NotRequired[Annotated[set[str], _merge_sets]]
+    stories: NotRequired[Annotated[dict[str, Story], operator.or_]]
+    contents: NotRequired[Annotated[dict[str, str], operator.or_]]
+    comments: NotRequired[Annotated[dict[str, list[str]], operator.or_]]
+    unreadable: NotRequired[Annotated[set[str], operator.or_]]
     segments: NotRequired[list[Segment]]
     curated_stories: NotRequired[list[CuratedStory]]
 

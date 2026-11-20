@@ -3,17 +3,14 @@
 import json
 import math
 import struct
-from typing import TYPE_CHECKING
 
 import httpx
 import pytest
 from pydantic import SecretStr, ValidationError
 
 from podcast.models import SpeechTurn, SynthesizedAudio
+from podcast.settings import Settings
 from podcast.tts import OpenRouterTTS
-
-if TYPE_CHECKING:
-    from podcast.settings import Settings
 
 _SAMPLE_VOICE_ID = "b347db033a6549378b48d00acb0d06cd"
 
@@ -118,6 +115,24 @@ async def test_synthesize_refuses_to_guess_missing_pcm_header_params(
             await tts.synthesize(sample_turns, title="Missing PCM Header")
 
 
+async def test_synthesize_rejects_empty_pcm_audio(
+    sample_turns: list[SpeechTurn],
+) -> None:
+    """Empty PCM response raises ValueError loudly instead of writing a 0s MP3."""
+    transport = httpx.MockTransport(
+        lambda _req: httpx.Response(
+            200,
+            content=b"",
+            headers={"content-type": "audio/pcm; rate=24000; channels=1"},
+        ),
+    )
+    async with httpx.AsyncClient(transport=transport) as client:
+        tts = OpenRouterTTS(api_key=SecretStr("unused"), client=client)
+        with pytest.raises(ValueError, match="empty PCM"):
+            await tts.synthesize(sample_turns, title="Empty PCM")
+
+
+@pytest.mark.live
 async def test_synthesize_live_audio_and_encode_mp3(
     live_settings: Settings,
     live_turns: list[SpeechTurn],
