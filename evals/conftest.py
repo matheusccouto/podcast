@@ -340,24 +340,26 @@ def jev_judge(eval_settings: Settings) -> OpenRouterJevModel:
 
 
 def build_script_metrics(jev_judge: OpenRouterJevModel) -> list[BaseMetric]:
-    """Build reference-free JevEval metrics for generic podcast craft."""
+    """Build reference-free JevEval metrics for podcast craft and localization."""
     podcast_craft = JevEval(
-        name="Podcast Craft & Naturalness",
+        name="Podcast Craft & Conversational Dynamics",
         evaluation_params=[SingleTurnParams.ACTUAL_OUTPUT],
         questions=[
             Noul(
-                "actual_output reads like a genuine spoken two-Persona podcast "
-                "conversation with natural rhythm, reactive handoffs, and "
-                "conversational phrasing, rather than essay prose or "
-                "AI-generated filler (such as robotic transitions, sycophantic "
-                "agreements, or listicle recitation).",
+                "actual_output reads like a genuinely interactive two-Persona "
+                "podcast conversation—with varied turn lengths, crisp short "
+                "reactions, playful pushback, genuine follow-up questions, and "
+                "callbacks to what the other Persona just said—rather than two "
+                "Personas merely taking turns reciting sequential summary "
+                "paragraphs, essay prose, or AI-generated filler.",
             ),
             Noul(
-                "actual_output organizes its stories and narrative beats like a "
-                "produced podcast episode—with an engaging opening hook, clear "
-                "story progression, organic thematic transitions between ideas "
+                "actual_output opens like a produced podcast Episode—greeting "
+                "or hooking the listener, introducing the Personas by name, "
+                "and framing what the Episode is about before diving into the "
+                "reporting—then connects stories via organic thematic bridges "
                 "(rather than mechanical signposting like 'moving on to topic "
-                "two' or 'in conclusion'), and a natural close.",
+                "two' or 'in conclusion') and lands on a natural close.",
             ),
             Noul(
                 "The turn-level vocal delivery `instructions` in actual_output "
@@ -369,20 +371,48 @@ def build_script_metrics(jev_judge: OpenRouterJevModel) -> list[BaseMetric]:
             ),
             Score(
                 "Regardless of language or topic, how authentically does "
-                "actual_output read as a high-quality, human-hosted podcast "
-                "transcript?",
+                "actual_output read as a broadcast-ready, conversational "
+                "podcast Script?",
                 levels=[
                     "Robotic, stiff, or unmistakably AI-generated summary",
-                    "Informative dialogue but noticeably scripted or formulaic",
+                    "Informative alternating summaries, noticeably scripted or flat",
                     "Natural, engaging two-Persona conversation with solid flow",
-                    "Broadcast-ready podcast craft with vivid pacing and delivery",
+                    "Broadcast-ready podcast craft with vivid chemistry and delivery",
                 ],
             ),
         ],
         system_one_model=jev_judge,
-        threshold=0.7,
+        threshold=0.75,
     )
-    return [podcast_craft]
+    editorial_polish = JevEval(
+        name="Editorial Polish & Localization",
+        evaluation_params=[SingleTurnParams.ACTUAL_OUTPUT],
+        questions=[
+            Noul(
+                "actual_output reads as an original, standalone editorial "
+                "podcast with zero meta-references to online aggregator "
+                "threads, comment sections, or forums (such as 'na thread', "
+                "'in the thread', 'nos comentários', or 'on Hacker News').",
+            ),
+            Noul(
+                "Whenever actual_output mentions countries, elections, laws, "
+                "regulators, or institutions outside the locale of its spoken "
+                "language, it identifies their country or context clearly for "
+                "local listeners instead of assuming foreign context "
+                "implicitly (for example, saying 'nos Estados Unidos' or "
+                "'eleições americanas' in Portuguese rather than bare "
+                "'as eleições').",
+            ),
+            Noul(
+                "actual_output uses natural, idiomatic spoken phrasing native "
+                "to its language rather than stiff word-for-word translations "
+                "or awkward foreign-language calques.",
+            ),
+        ],
+        system_one_model=jev_judge,
+        threshold=0.75,
+    )
+    return [podcast_craft, editorial_polish]
 
 
 @pytest.fixture(scope="session")

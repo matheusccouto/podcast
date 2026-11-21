@@ -7,7 +7,7 @@ Source URL: {{ story.url or "N/A" }}
 Key Facts:
 {% if story.key_facts %}{% for fact in story.key_facts %}  - {{ fact }}
 {% endfor %}{% else %}  - None recorded
-{% endif %}Community Comments:
+{% endif %}Discussion:
 {% if story.comments %}{% for comment in story.comments %}  - {{ comment }}
 {% endfor %}{% else %}  - None recorded
 {% endif %}Article Text:
