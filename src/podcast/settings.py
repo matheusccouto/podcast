@@ -29,7 +29,7 @@ class Settings(BaseSettings):
         description="OpenRouter LLM model ID.",
     )
     tts_model: str = Field(
-        default="fish-audio/s2.1-pro-free:free",
+        default="google/gemini-3.8-flash-tts",
         description="OpenRouter TTS model ID.",
     )
     podcast_language: str = Field(
@@ -60,8 +60,8 @@ class Settings(BaseSettings):
         default=Path("dist"),
         description="Output directory for published RSS Feed and Episode files.",
     )
-    persona_a_voice_id: CliSuppress[str] = ""
-    persona_b_voice_id: CliSuppress[str] = ""
+    persona_a_voice_id: CliSuppress[str] = "Puck"
+    persona_b_voice_id: CliSuppress[str] = "Aoede"
 
     @property
     def personas(self) -> tuple[Persona, Persona]:

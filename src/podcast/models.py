@@ -7,25 +7,17 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 MAX_CONTENT_CHARS = 40_000
 _MIN_TURN_WORDS = 3
-_MAX_TAG_WORDS = 6
 _MIN_DIALOGUE_WORDS = 400
 _MAX_DIALOGUE_WORDS = 1500
 _MIN_DISTINCT_VOICES = 2
 
 _XML_TAG_RE = re.compile(r"<[^>]+>")
-_BRACKET_TAG_RE = re.compile(r"\[([^\[\]]*)\]")
-_VALID_TAG_BODY_RE = re.compile(r"^[a-zA-ZÀ-ÿ][a-zA-ZÀ-ÿ\s,'-]{0,40}$")
 _PAREN_DIRECTION_RE = re.compile(
     r"\((?:laughs?|chuckles?|sighs?|gasps?|groans?|pauses?|music|sfx|applause|"
     r"excited|whispering|whispers?|rindo|risos|pausa|suspira|sussurrando|"
     r"musica|música|aplausos|animad[oa]|surpres[oa])\b[^)]*\)",
     re.IGNORECASE,
 )
-
-
-def _spoken_words(text: str) -> list[str]:
-    """Return spoken words in a text string after stripping inline [bracket] cues."""
-    return _BRACKET_TAG_RE.sub("", text).split()
 
 
 class _DomainModel(BaseModel):
@@ -88,40 +80,26 @@ class SpeechTurn(_DomainModel):
 
     voice: str = Field(min_length=1)
     text: str
+    instructions: str | None = Field(default=None, max_length=160)
 
     @field_validator("text")
     @classmethod
     def validate_tts_text(cls, value: str) -> str:
-        """Validate spoken turn length, XML/paren exclusion, and [bracket] tags."""
+        """Keep turn text verbatim speech: reject XML, stage parens, and brackets."""
         if _XML_TAG_RE.search(value):
             msg = "Contains forbidden XML/SSML tags."
             raise ValueError(msg)
         if _PAREN_DIRECTION_RE.search(value):
-            msg = "Use [bracket] cues instead of (parenthesis) stage directions."
+            msg = "Put delivery cues in `instructions`, not (parenthesis) in `text`."
+            raise ValueError(msg)
+        if "[" in value or "]" in value:
+            msg = "Put delivery cues in `instructions`, not [bracket] tags in `text`."
             raise ValueError(msg)
 
-        for match in _BRACKET_TAG_RE.finditer(value):
-            tag = match.group(1).strip()
-            if (
-                not tag
-                or not _VALID_TAG_BODY_RE.fullmatch(tag)
-                or len(tag.split()) > _MAX_TAG_WORDS
-            ):
-                msg = (
-                    f"Invalid Fish Audio bracket tag '[{tag}]'; use concise "
-                    "natural-language delivery cues (1-6 words, no digits or symbols)."
-                )
-                raise ValueError(msg)
-
-        without_tags = _BRACKET_TAG_RE.sub("", value)
-        if "[" in without_tags or "]" in without_tags:
-            msg = "Contains unbalanced or nested square brackets."
-            raise ValueError(msg)
-
-        if len(without_tags.split()) < _MIN_TURN_WORDS:
+        if len(value.split()) < _MIN_TURN_WORDS:
             msg = (
                 f"Turn must contain at least {_MIN_TURN_WORDS} spoken words "
-                "outside [bracket] tags so TTS language detection stays stable."
+                "so TTS language detection stays stable."
             )
             raise ValueError(msg)
         return value
@@ -136,8 +114,8 @@ class Dialogue(_DomainModel):
 
     @property
     def spoken_word_count(self) -> int:
-        """Count spoken words across all turns excluding inline [bracket] cues."""
-        return sum(len(_spoken_words(turn.text)) for turn in self.turns)
+        """Count spoken words across all turns."""
+        return sum(len(turn.text.split()) for turn in self.turns)
 
     @model_validator(mode="after")
     def validate_dialogue(self) -> Dialogue:

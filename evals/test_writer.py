@@ -20,7 +20,7 @@ from podcast.settings import Settings
 _DATASET = load_golden_dataset()
 if not _DATASET.goldens:
     pytest.skip(
-        "No fixtures in evals/golden/writer/. Run evals.golden.writer.download first.",
+        "No fixtures in evals/golden/writer/. Run /refresh-writer-goldens first.",
         allow_module_level=True,
     )
 
@@ -35,7 +35,7 @@ def test_scriptwriter_matches_indicator_quality_bar(
     eval_settings: Settings,
     script_metrics: list[BaseMetric],
 ) -> None:
-    """Evaluate Fish Audio SpeechTurn grounding and style similarity via JevEval."""
+    """Evaluate SpeechTurn grounding and style similarity via JevEval."""
     metadata = cast("dict[str, object]", golden.additional_metadata or {})
     raw_stories = cast("list[dict[str, object]]", metadata["stories"])
     golden_stories = [GoldenStory.model_validate(item) for item in raw_stories]

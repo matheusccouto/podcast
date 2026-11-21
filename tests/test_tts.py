@@ -12,7 +12,7 @@ from podcast.models import SpeechTurn, SynthesizedAudio
 from podcast.settings import Settings
 from podcast.tts import OpenRouterTTS
 
-_SAMPLE_VOICE_ID = "b347db033a6549378b48d00acb0d06cd"
+_SAMPLE_VOICES = ("Puck", "Aoede")
 
 
 @pytest.fixture(scope="module")
@@ -31,10 +31,10 @@ def live_turns(
     live_settings: Settings,
     sample_turns: list[SpeechTurn],
 ) -> list[SpeechTurn]:
-    """Bind configured or fallback Fish Audio voice IDs onto sample_turns."""
+    """Bind configured or fallback OpenRouter TTS voice IDs onto sample_turns."""
     voices = (
-        live_settings.persona_a_voice_id or _SAMPLE_VOICE_ID,
-        live_settings.persona_b_voice_id or _SAMPLE_VOICE_ID,
+        live_settings.persona_a_voice_id or _SAMPLE_VOICES[0],
+        live_settings.persona_b_voice_id or _SAMPLE_VOICES[1],
     )
     return [
         turn.model_copy(update={"voice": voice})
@@ -42,41 +42,42 @@ def live_turns(
     ]
 
 
-def test_speech_turn_accepts_valid_bracket_cue() -> None:
-    """SpeechTurn accepts valid Fish Audio [bracket] performance markers."""
+def test_speech_turn_accepts_verbatim_text_and_instructions() -> None:
+    """SpeechTurn accepts clean spoken text with model-agnostic delivery direction."""
     valid = SpeechTurn(
-        voice="v1",
-        text="[chuckle] Agora vamos entender como o kernel processa isso.",
+        voice="Puck",
+        text="Agora vamos entender como o kernel processa isso.",
+        instructions="Amused, brief chuckle at the start",
     )
-    assert valid.voice == "v1"
+    assert valid.voice == "Puck"
+    assert valid.instructions == "Amused, brief chuckle at the start"
 
 
 @pytest.mark.parametrize(
     "bad_text",
     [
-        "[excited] Sim.",
+        "Sim.",
         "<speak>Ola mundo em XML.</speak>",
         "Isso foi muito rapido (laughs) no servidor.",
-        "[] Texto com colchete vazio aqui.",
-        "[12345] Texto com numero no colchete aqui.",
+        "[chuckle] Agora vamos entender como o kernel processa isso.",
         "[unbalanced bracket inside spoken sentence here.",
     ],
 )
-def test_speech_turn_rejects_invalid_markup_and_short_turns(bad_text: str) -> None:
-    """SpeechTurn rejects short utterances, XML, parentheses, and bad brackets."""
+def test_speech_turn_rejects_inline_markup_and_short_turns(bad_text: str) -> None:
+    """SpeechTurn rejects short utterances, XML, stage parens, and inline brackets."""
     with pytest.raises(ValidationError):
-        SpeechTurn(voice="v1", text=bad_text)
+        SpeechTurn(voice="Puck", text=bad_text)
 
 
 async def test_synthesize_encodes_pcm_to_mp3_via_ffmpeg(
     sample_turns: list[SpeechTurn],
     sine_pcm_one_second: bytes,
 ) -> None:
-    """Per-turn PCM bytes are joined with pauses and normalized into MP3 via ffmpeg."""
+    """Multi-turn batch PCM bytes are normalized into MP3 via ffmpeg."""
     captured_payloads: list[dict[str, object]] = []
 
     def _handler(request: httpx.Request) -> httpx.Response:
-        """Capture outgoing per-turn TTS payload and return synthetic 1s PCM bytes."""
+        """Capture outgoing multi-turn TTS payload and return synthetic 1s PCM bytes."""
         captured_payloads.append(json.loads(request.content))
         return httpx.Response(
             200,
@@ -93,14 +94,73 @@ async def test_synthesize_encodes_pcm_to_mp3_via_ffmpeg(
 
     assert captured_payloads == [
         {
-            "model": "fish-audio/s2.1-pro-free:free",
-            "input": turn.text,
-            "voice": turn.voice,
+            "model": "google/gemini-3.8-flash-tts",
+            "input": [
+                {
+                    "text": turn.text,
+                    "voice": turn.voice,
+                    "instructions": turn.instructions,
+                }
+                for turn in sample_turns
+            ],
             "response_format": "pcm",
-        }
-        for turn in sample_turns
+        },
     ]
     assert audio.mp3_bytes[:3] == b"ID3"
+    assert audio.duration_seconds == 1
+
+
+async def test_synthesize_splits_batches_and_forwards_instructions(
+    sine_pcm_one_second: bytes,
+) -> None:
+    """Long dialogues split on turn boundaries and include per-turn instructions."""
+    turns = [
+        SpeechTurn(
+            voice="v1",
+            text="Primeiro turno bem longo para forcar divisao em dois lotes.",
+            instructions="Speak warmly in pt-BR.",
+        ),
+        SpeechTurn(
+            voice="v2",
+            text="Segundo turno tambem longo para ir no segundo lote de audio.",
+        ),
+    ]
+    captured_payloads: list[dict[str, object]] = []
+
+    def _handler(request: httpx.Request) -> httpx.Response:
+        captured_payloads.append(json.loads(request.content))
+        return httpx.Response(
+            200,
+            content=sine_pcm_one_second,
+            headers={"content-type": "audio/pcm; rate=24000; channels=1"},
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(_handler)) as client:
+        tts = OpenRouterTTS(
+            api_key=SecretStr("unused"),
+            max_batch_chars=90,
+            client=client,
+        )
+        audio = await tts.synthesize(turns, title="Teste Lotes")
+
+    assert captured_payloads == [
+        {
+            "model": "google/gemini-3.8-flash-tts",
+            "input": [
+                {
+                    "text": turns[0].text,
+                    "voice": "v1",
+                    "instructions": "Speak warmly in pt-BR.",
+                },
+            ],
+            "response_format": "pcm",
+        },
+        {
+            "model": "google/gemini-3.8-flash-tts",
+            "input": [{"text": turns[1].text, "voice": "v2"}],
+            "response_format": "pcm",
+        },
+    ]
     assert audio.duration_seconds == 2
 
 

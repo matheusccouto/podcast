@@ -15,7 +15,8 @@ from podcast.models import SpeechTurn, SynthesizedAudio
 logger = logging.getLogger(__name__)
 
 _REQUEST_TIMEOUT_SECONDS = 180.0
-_TURN_PAUSE_SECONDS = 0.25
+_BATCH_PAUSE_SECONDS = 0.15
+_DEFAULT_MAX_BATCH_CHARS = 2_400
 _RATE_RE = re.compile(r"rate=(\d+)")
 _CHANNELS_RE = re.compile(r"channels=(\d+)")
 
@@ -27,15 +28,37 @@ class OpenRouterTTS:
         self,
         *,
         api_key: SecretStr,
-        model: str = "fish-audio/s2.1-pro-free:free",
+        model: str = "google/gemini-3.8-flash-tts",
         base_url: str = "https://openrouter.ai/api/v1",
+        max_batch_chars: int = _DEFAULT_MAX_BATCH_CHARS,
         client: httpx.AsyncClient | None = None,
     ) -> None:
         """Store OpenRouter credentials, TTS model identifier, and optional client."""
         self.api_key = api_key
         self.model = model
         self.base_url = base_url.rstrip("/")
+        self.max_batch_chars = max_batch_chars
         self.client = client
+
+    def _batch_turns(self, turns: Sequence[SpeechTurn]) -> list[list[SpeechTurn]]:
+        """Group consecutive turns into multi-turn dialogue batches under char limit."""
+        batches: list[list[SpeechTurn]] = []
+        current: list[SpeechTurn] = []
+        current_chars = 0
+
+        for turn in turns:
+            turn_chars = len(turn.text) + len(turn.instructions or "")
+            if current and current_chars + turn_chars > self.max_batch_chars:
+                batches.append(current)
+                current = [turn]
+                current_chars = turn_chars
+            else:
+                current.append(turn)
+                current_chars += turn_chars
+
+        if current:
+            batches.append(current)
+        return batches
 
     async def synthesize(
         self,
@@ -43,7 +66,7 @@ class OpenRouterTTS:
         *,
         title: str,
     ) -> SynthesizedAudio:
-        """Synthesize each SpeechTurn, join PCM with turn pauses, and encode MP3."""
+        """Synthesize multi-turn dialogue batches, join PCM, and encode MP3."""
         if not turns:
             msg = "Cannot synthesize an empty SpeechTurn list."
             raise ValueError(msg)
@@ -52,22 +75,23 @@ class OpenRouterTTS:
             msg = "ffmpeg binary not found in PATH"
             raise FileNotFoundError(msg)
 
+        batches = self._batch_turns(turns)
         pcm_chunks: list[bytes] = []
         audio_format: tuple[int, int] | None = None
         ctx = (
             nullcontext(self.client) if self.client is not None else httpx.AsyncClient()
         )
         async with ctx as active_client:
-            for turn in turns:
-                chunk, sample_rate, channels = await self._request_turn_pcm(
+            for batch in batches:
+                chunk, sample_rate, channels = await self._request_batch_pcm(
                     active_client,
-                    turn,
+                    batch,
                 )
                 if audio_format is None:
                     audio_format = (sample_rate, channels)
                 elif audio_format != (sample_rate, channels):
                     msg = (
-                        f"Inconsistent PCM format across turns: expected "
+                        f"Inconsistent PCM format across batches: expected "
                         f"{audio_format}, got {(sample_rate, channels)}"
                     )
                     raise ValueError(msg)
@@ -75,7 +99,7 @@ class OpenRouterTTS:
 
         assert audio_format is not None  # noqa: S101
         sample_rate, channels = audio_format
-        pause = b"\x00" * (int(sample_rate * _TURN_PAUSE_SECONDS) * channels * 2)
+        pause = b"\x00" * (int(sample_rate * _BATCH_PAUSE_SECONDS) * channels * 2)
         pcm_bytes = pause.join(pcm_chunks)
         duration_seconds = round(len(pcm_bytes) / (sample_rate * channels * 2))
         mp3_bytes = await self._encode_mp3(
@@ -86,24 +110,24 @@ class OpenRouterTTS:
             title=title,
         )
         logger.info(
-            "Synthesized %d turns into %ds MP3 (%d bytes) via %s",
+            "Synthesized %d turns in %d batch(es) into %ds MP3 (%d bytes) via %s",
             len(turns),
+            len(batches),
             duration_seconds,
             len(mp3_bytes),
             self.model,
         )
         return SynthesizedAudio(mp3_bytes=mp3_bytes, duration_seconds=duration_seconds)
 
-    async def _request_turn_pcm(
+    async def _request_batch_pcm(
         self,
         client: httpx.AsyncClient,
-        turn: SpeechTurn,
+        batch: Sequence[SpeechTurn],
     ) -> tuple[bytes, int, int]:
-        """Request raw PCM bytes for one SpeechTurn and parse its audio format."""
-        payload = {
+        """Request raw PCM bytes for a multi-turn dialogue batch."""
+        payload: dict[str, object] = {
             "model": self.model,
-            "input": turn.text,
-            "voice": turn.voice,
+            "input": [turn.model_dump(exclude_none=True) for turn in batch],
             "response_format": "pcm",
         }
         headers = {

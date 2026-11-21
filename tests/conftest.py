@@ -23,11 +23,11 @@ def sample_turns() -> list[SpeechTurn]:
         SpeechTurn(
             voice="voice-a",
             text="Hoje vamos analisar uma novidade importante de sistemas.",
+            instructions="Warm, curious, conversational podcast tone",
         ),
         SpeechTurn(
             voice="voice-b",
-            text=(
-                "[excited] Essa mudanca traz ganhos reais de desempenho em producao."
-            ),
+            text="Essa mudanca traz ganhos reais de desempenho em producao.",
+            instructions="Excited, upbeat reaction",
         ),
     ]

@@ -49,7 +49,7 @@ Namespaces are one honking great idea -- let's do more of those!
 │   └── architecture/       # C4 Mermaid diagrams
 ├── evals/
 │   ├── conftest.py         # Judge adapter, metrics, and dataset loader
-│   ├── golden/             # Golden reference fixtures and downloader
+│   ├── golden/             # Golden reference fixtures
 │   └── ...                 # Evaluation test suites
 ├── src/podcast/
 │   ├── __main__.py         # CLI entrypoint and daily pipeline orchestration
@@ -71,7 +71,7 @@ Namespaces are one honking great idea -- let's do more of those!
 - https://docs.astral.sh/ruff/llms.txt
 - https://docs.astral.sh/ty/llms.txt
 - https://openrouter.ai/docs/llms.txt
-- https://openrouter.ai/fish-audio/s2.1-pro-free:free/llms.txt
+- https://openrouter.ai/<model_id>/llms.txt
 - https://docs.langchain.com/llms.txt
 - https://docs.exa.ai/llms.txt
 - https://deepeval.com/llms.txt

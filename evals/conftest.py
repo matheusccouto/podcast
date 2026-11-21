@@ -380,14 +380,14 @@ def script_metrics(jev_judge: OpenRouterJevModel) -> list[BaseMetric]:
             ),
             Score(
                 "How closely does actual_output match expected_output in "
-                "pacing, explanatory clarity, and conversational craft "
-                "(ignoring language translation into pt-BR and inline "
-                "[bracket] Fish Audio cues)?",
+                "pacing, explanatory clarity, conversational craft, and natural "
+                "turn-level vocal delivery `instructions` (accounting for "
+                "localization into pt-BR)?",
                 levels=[
-                    "Flat monologue or robotic turns lacking narrative flow",
-                    "Accurate summary but stiffer or slower than reference",
-                    "Engaging two-Persona conversation comparable to reference",
-                    "Tight, vivid, broadcast-ready dialogue matching reference",
+                    "Flat monologue or robotic turns lacking narrative flow or cues",
+                    "Accurate summary but stiffer or sparser delivery than reference",
+                    "Engaging two-Persona conversation with natural delivery cues",
+                    "Tight, vivid, broadcast-ready dialogue matching reference cadence",
                 ],
             ),
         ],
