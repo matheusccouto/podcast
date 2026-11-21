@@ -1,0 +1,217 @@
+{
+  "date": "2025-10-31",
+  "stories": [
+    {
+      "title": "Cell Phone Bans in Schools: Evidence from Florida",
+      "url": "https://www.nber.org/papers/w34388",
+      "content": "The Impact of Cellphone Bans in Schools on Student Outcomes: Evidence from Florida | NBER\n\n# The Impact of Cellphone Bans in Schools on Student Outcomes: Evidence from Florida \n\n David N. Figlio & Umut Özek \n\n Cellphone bans in schools have become a popular policy in recent years in the United States, yet very little is known about their effects on student outcomes. In this study, we try to fill this gap by examining the causal effects of bans on student test scores, suspensions, and absences using detailed student-level data from Florida and a quasi-experimental research strategy relying upon differences in pre-ban cellphone use by students, as measured by building-level Advan data. Several important findings emerge. First, we show that the enforcement of cellphone bans in schools led to a significant increase in student suspensions in the short-term, especially among Black students, but disciplinary actions began to dissipate after the first year, potentially suggesting a new steady state after an initial adjustment period. Second, we find significant improvements in student test scores in the second year of the ban after that initial adjustment period. Third, the findings suggest that cellphone bans in schools significantly reduce student unexcused absences, an effect that may explain a large fraction of the test score gains. The effects of cellphone bans are more pronounced in middle and high school settings where student smartphone ownership is more common. \n\n- Acknowledgements and Disclosures\n\n The authors thank the anonymous school district for providing the data used in the analysis, and for providing useful feedback, and the Smith Richardson Foundation for generous research funding. Note that the views expressed are those of the authors and do not necessarily reflect those of the anonymous district or the institution to which the authors are affiliated, nor those of the National Bureau of Economic Research. The authors have no relevant financial or other relationships to disclose. \n- Citation and Citation Data\n\nCopy Citation\n\n David N. Figlio and Umut Özek, \"The Impact of Cellphone Bans in Schools on Student Outcomes: Evidence from Florida,\" NBER Working Paper 34388 (2025), https://doi.org/10.3386/w34388. \n\n Copy to Clipboard \n\nDownload Citation\n\n MARC RIS BibTeΧ \n\nDownload Citation Data\n\n- School Cell Phone Bans and Student Achievement \n\n Author(s): David N. Figlio Umut Özek \n\n Two years after the imposition of a student cell phone ban, student test scores in a large urban school district were significantly higher... \n\nNational Bureau of Economic Research\n\nContact Us 1050 Massachusetts Avenue Cambridge, MA 02138 617-868-3900 (+16178683900) info@nber.org webaccessibility@nber.org"
+    },
+    {
+      "title": "Is AI Contributing to Unemployment? Evidence from Occupational Variation",
+      "url": "https://www.stlouisfed.org/on-the-economy/2025/aug/is-ai-contributing-unemployment-evidence-occupational-variation",
+      "content": "Is AI Contributing to Rising Unemployment? | St. Louis Fed\n\n# Is AI Contributing to Rising Unemployment? Evidence from Occupational Variation\n\n August 26, 2025 \n\n By Serdar Ozkan , Nicholas Sullivan \n\nThe July jobs report showed a sharp deceleration in payroll growth with an average of just 35,000 jobs per month from May through July—well below previous years’ robust gains. The unemployment rate rose to 4.2%, marking a meaningful shift from stronger prepandemic conditions; unemployment averaged 3.7% in 2019.\n\nWhile economists debate various causes for the labor market softening, one potential factor deserves closer scrutiny: the rapid adoption of artificial intelligence (AI) tools in the workplace. Could widespread deployment of large language models (LLMs) like ChatGPT, Claude and others be contributing to rising unemployment?\n\n## Rapid AI Adoption in the Workplace\n\nBy early 2023, generative AI had become ubiquitous across the American workforce. ChatGPT and similar tools were integrated into browsers, office software and search engines, making LLM use routine for millions of workers. According to the nationally representative Real-Time Population Survey (RPS), The RPS asks the same core questions and follows the same timing and structure as the Current Population Survey (CPS), the monthly labor force survey conducted by the U.S. Census Bureau for the Bureau of Labor Statistics. 23% of employed workers used generative AI for work at least once per week as of late 2024—a remarkable adoption rate for such a nascent technology. See Alexander Bick, Adam Blandin and David J. Deming’s Federal Reserve Bank of St. Louis Working Paper 2024-027E, “ The Rapid Adoption of Generative AI.” Despite this widespread integration, we still know surprisingly little about AI’s employment effects because of the newness of the technology.\n\n## Measuring AI’s Impact: Two Complementary Approaches\n\nWe use two distinct measures of AI’s prevalence across occupations to investigate whether AI adoption correlates with rising unemployment:\n\n- Theoretical AI Exposure: We used groundbreaking work published last year that employed both human annotators and OpenAI’s GPT-4 model itself to assess whether LLMs could reduce task completion time by at least 50%. See Tyna Eloundou, Sam Manning, Pamela Mishkin and Daniel Rock’s June 2024 article, “ GPTs Are GPTs: Labor Market Impact Potential of LLMs,” in Science. The researchers applied this methodology to 19,265 tasks from the U.S. Department of Labor’s O*NET database, then aggregated results at the occupational level to create comprehensive AI exposure scores.\n- Actual AI Adoption: We examined real-world uptake patterns from the RPS, in which workers reported the intensity of their actual generative AI usage and time savings. This approach captures not just theoretical potential but genuine workplace integration.\n\n## AI and Unemployment\n\nBoth measures reveal a striking correlation between AI’s prevalence and unemployment increases since 2022.\n\nThe figure below shows that occupations with higher AI exposure experienced larger unemployment rate increases between 2022 and 2025, with a 0.47 correlation coefficient. We measured the percentage point change in unemployment using the three-month average unemployment rates for May through July in 2022 and 2025 to smooth out monthly volatility and control for seasonality in the data. Computer and mathematical occupations—predictably among the most AI-exposed, with a score around 80%—saw some of the steepest unemployment rises. Meanwhile, blue-collar jobs and personal service roles, which have limited AI applicability, experienced relatively smaller increases.\n\nAI Exposure and Change in Unemployment across Occupations\n\nSOURCES: Eloundou et al. (2024), Current Population Survey, Bureau of Labor Statistics and authors’ calculations.\n\nNOTES: This figure plots occupations’ 2022-25 change in unemployment rate versus their AI exposure rate. AI exposure rate is derived from ChatGPT-β predicted exposure via Eloundou et al. (2024). The unemployment rates are the three-month averages for May through July in 2022 and 2025.\n\nThe following figure uses actual adoption data that reinforce this pattern. Occupations that embraced generative AI most intensively showed the largest unemployment gains, with a correlation coefficient of 0.57. Again, computer and mathematical occupations, which adopted these technologies most heavily, experienced substantial unemployment increases.\n\nAI Adoption and Change in Unemployment across Occupations\n\nSOURCES: RPS, Current Population Survey, Bureau of Labor Statistics and authors’ calculations.\n\nNOTES: This figure plots occupations’ 2022-25 change in unemployment rate versus their AI adoption rate. AI adoption rate is derived from the RPS. The unemployment rates are the three-month averages for May through July in 2022 and 2025.\n\n## Why This Matters\n\nThese patterns are particularly striking in technology sectors, where workers might expect AI to augment rather than to replace their roles. Software developers, data analysts and other tech professionals are finding that AI tools can indeed accelerate certain tasks, but potentially at the cost of overall employment demand.\n\nOur results suggest we may be witnessing the early stages of AI-driven job displacement. Unlike previous technological revolutions that primarily affected manufacturing or routine clerical work, generative AI can target cognitive tasks performed by knowledge workers—traditionally among the most secure employment categories.\n\n## Limitations and Future Research\n\nThe findings presented here represent correlation, not causation. Multiple factors could explain rising unemployment in AI-exposed occupations, including economic uncertainty, postpandemic monetary policy tightening and chance timing. Furthermore, this analysis is based on preliminary findings in a rapidly evolving field. However, the consistency across both theoretical exposure and actual adoption measures suggests the relationship may be more than coincidental.\n\nAdditionally, the technology is so new that longer-term effects remain unknown. If generative AI drives sustained productivity growth, it could ultimately create new jobs and industries, potentially offsetting displacement effects. As AI capabilities continue advancing rapidly, monitoring these employment patterns becomes increasingly critical.\n\n## Looking Ahead\n\nThe data raise important questions about our economic transition into the AI era. If current trends continue, new approaches to workforce development, social safety nets and economic support for displaced workers may merit greater consideration. As we navigate this technological revolution, understanding potential early warning signs could prove crucial for protecting U.S. workers and maintaining economic stability.\n\nNotes\n\n1. The RPS asks the same core questions and follows the same timing and structure as the Current Population Survey (CPS), the monthly labor force survey conducted by the U.S. Census Bureau for the Bureau of Labor Statistics.\n2. See Alexander Bick, Adam Blandin and David J. Deming’s Federal Reserve Bank of St. Louis Working Paper 2024-027E, “ The Rapid Adoption of Generative AI.”\n3. See Tyna Eloundou, Sam Manning, Pamela Mishkin and Daniel Rock’s June 2024 article, “ GPTs Are GPTs: Labor Market Impact Potential of LLMs,” in Science.\n\nEmail Us\n\nMedia questions (mediainquiries@stls.frb.org)"
+    },
+    {
+      "title": "Tricks, Treats, and Tariffs: How Trump Is Making Halloween More Expensive",
+      "url": "https://tcf.org/content/commentary/tricks-treats-and-tariffs-how-trump-is-making-halloween-more-expensive/",
+      "content": "Tricks, Treats, and Tariffs: How Trump Is Making Halloween More Expensive\n\n# Tricks, Treats, and Tariffs: How Trump Is Making Halloween More Expensive\n\nOctober 27, 2025\n\n- ##### Nia Law\n\nContributor\n- ##### Elizabeth Pancotti\n\nContributor\n- ##### Rachel West\n\nContributor\n\nAs kids prepare their costumes and families stock up on candy, new analysis from Groundwork Collaborative and The Century Foundation finds that Halloween will be more expensive this year under Trump—with prices for candy up 10.8 percent compared to last year, nearly four times overall inflation. Beyond candy, President Trump’s tariffs are hiking prices for seasonal decorations and costumes, 85 percent of which are made in China.\n\nThese price hikes come as families are facing a broader cost of living crunch. For both seasonal staples and year-round essentials, families are being squeezed in the checkout line. Just last month, grocery prices saw their biggest spike in nearly three years, and have increased overall nearly 3 percent since Trump took office.\n\nAs prices climb, shoppers are feeling the squeeze: 8 in 10 Americans say tariffs will make Halloween more expensive and many are flocking to discount stores to stock up on Halloween staples, with 42 percent now calling them their go-to destination—up from 37 percent last year.\n\nPresident Trump promised to lower costs for American families, but has instead turned what should be a time of fun and celebration into a struggle to afford the basics.\n\n## Sweet Treats, Sour Prices\n\nCandy is a Halloween staple as four in five Americans purchase sweets during the season. But with prices already soaring, trick-or-treaters may find their bags a little lighter this year. New analysis finds that top Halloween candy packs cost an average of 10.8 percent more this year—nearly four times inflation over the past year. 1 \n\nPrice hikes on certain candy staples are especially large: Tootsie Roll lollipops are running families almost 34 percent more this season. Variety packs from Hershey’s (maker of KitKats, Twizzlers, Reeses, and Heath bars) are up 22 percent, while variety packs from Mars (maker of Milky Way, M&Ms, Three Musketeers, and Skittles) are up 12 percent.\n\nLovers of fruity candies from manufacturers Mondelez (maker of Sour Patch Kids) and Perfetti Van Malle (maker of Airheads) are facing price increases of more than 9 percent and 7 percent, respectively. And bubble-gum-blowers will see price hikes ranging from roughly 5 percent to 7 percent from Charms (maker of Blow Pops and Double Bubble).\n\n###### Table 1\n\nThese price increases are a direct result of Trump’s tariffs, which are hitting key ingredients that candy makers rely on. Approximately 70 percent of cocoa beans are produced in west African countries, and over one-third are processed in European nations. As a result, the vast majority of cocoa and cocoa products have been hit with tariffs ranging between 15 percent and 39 percent.\n\nChocolate giants like Hershey project $100 million in added costs from these tariffs in just the second half of 2025. For small businesses, the impact is even more dire. Massachusetts-based Taza Chocolate was hit with a more than $24,000 duty on a shipment of cocoa from Haiti, leading the candymaker to consider relocating to Canada and raise its wholesale prices by 10 percent, with further tariff-driven price hikes likely on the horizon.\n\n## Spooky Costumes, Scarier Costs\n\nFamilies are shelling out more than ever this Halloween season—on items from cosplay makeup to giant lawn skeletons. More than 85 percent of Halloween decorations and costumes are made in China, and thanks to Trump, face tariffs nearly 40 percentage points higher than at the start of this year. Now he’s threatening to slap an additional 100 percent tariff on Chinese imports.\n\nAt Magic Etc. Ft. Worth Costume Inc. in northern Texas, fog machines have jumped from $58 to $74, and the local business faces import surcharges on shipments as high as $700. Even the holiday’s most popular showpieces aren’t immune: last year a twelve-foot Bone Collector at Lowe’s went for $399. This year, it’s listed at $449.\n\nThese high prices are scaring off shoppers: Spirit Halloween, which markets itself as the one-stop Halloween shop, has already seen a plunge in sales. Sales were down 32 percent in August and nearly 8 percent in September and the first half of October compared to last year, according to Bloomberg Second Measure’s consumer transaction data.\n\nEven DIY costumes can’t help Halloween-goers escape higher prices, with prices for clothing and shoes rising 25 percent faster than overall inflation. Throwing on a jersey and sneakers might seem like a cheap, low-effort costume, but it still stings as brands like Nike hike prices. A basic costume such as facepainted cat whiskers now costs more, with beauty products imported from South Korea, France, Italy, Canada, and China facing average tariffs of 17 percent, pushing even budget brands like e.l.f. to raise prices.\n\nRetailers like Walmart and Target, where a majority of Americans shop for Halloween supplies, are sounding the alarm that Trump’s chaotic tariffs are causing prices to rise. On the retailers’ August earnings calls, Target CEO Brian Cornell described the tariff environment as “challenging and highly uncertain,” while Walmart CEO Doug McMillon warned that, as a result of tariffs, “costs increase each week.” As corporations protect their profit margins, families will be left paying the price for Trump’s trade policies, shouldering more than 50 percent of tariff costs by year’s end, according to Goldman Sachs.\n\n## The Fright Doesn’t End with Halloween Night\n\nHalloween season comes as consumer sentiment has sunk to its seventh-lowest reading since records began in 1952—lower than any point during the Great Recession. Skyrocketing prices are hitting families just as it is harder to keep or secure steady paychecks. Wage growth has plunged for workers at the bottom, unemployment is creeping up, and Goldman Sachs has noted that labor market strength has plummeted back to 2015 levels. More and more families are getting trapped in a cycle of debt, with nearly 6 in 10 consumers relying on credit cards and 1 in 4 using Buy Now, Pay Later loans for holiday shopping.\n\nAs the president continues waging chaotic trade wars, cancelling public investments, and cutting vital programs like Medicaid and food assistance, there’s no relief in sight for families. Until Trump changes course, working families will keep getting spooked at the checkout line.\n\n#### Notes\n\n1. Authors’ own analyses and calculations based in part on data reported by NIQ for the listed product categories for the four-week periods ending October 11, 2025 and October 12, 2024 for the total U.S. market and total FMCG retailer channel. The conclusions drawn from the NIQ data are those of the authors and do not reflect the views of NIQ. NIQ is not responsible for and had no role in and was not involved in analysis and preparing the results reported herein or developing, reviewing, or confirming the research approaches in connection with this report."
+    }
+  ],
+  "expected_output": [
+    {
+      "voice": "persona_a",
+      "text": "This is The Indicator from Planet Money. Happy Halloween, by the way. I'm your spooky host, Adrian Ma, here with the witchy Wailin Wong.",
+      "instructions": "Playful, theatrical spooky cadence stretching 'spooky' and 'witchy'"
+    },
+    {
+      "voice": "persona_b",
+      "text": "Doo doo doo doo doo, doo doo doo doo doo. That's the witch music from Wizard of Oz. And your little dog, too!",
+      "instructions": "Singsong Wicked Witch melody, then cackling in a playful witch voice"
+    },
+    {
+      "voice": "persona_a",
+      "text": "And we are joined by the dreadful Darian Woods. Happy Halloween to you, too. We are here not to scare or to freak you out. Let's leave that to your, you know, everyday lives. We're here to bring you some indicators. Indicators of the Week.",
+      "instructions": "Warm chuckling banter, dramatic mock-spooky pause before 'Indicators of the Week'"
+    },
+    {
+      "voice": "persona_b",
+      "text": "Yes. It is that show where we take interesting economic headlines from the week, and we bring them to you. I actually am looking at a big spider right now in my studio. I'm hoping it doesn't come any closer.",
+      "instructions": "Upbeat, bright broadcast energy, shifting to amused disbelief about the spider"
+    },
+    {
+      "voice": "persona_a",
+      "text": "Very on theme. On today's show, we have got the evidence coming in on cell phone bans in schools, white-collar workers getting the ax, and the spookiest indicator of all.",
+      "instructions": "Crisp, energetic teaser pace building momentum"
+    },
+    {
+      "voice": "persona_b",
+      "text": "Higher Halloween chocolate prices this year. Terrifying.",
+      "instructions": "Playfully ominous rise on 'chocolate prices', then deadpan 'Terrifying'"
+    },
+    {
+      "voice": "persona_a",
+      "text": "My indicator is about Amazon. And obligatory disclaimer here, Amazon is a financial supporter of NPR and pays to distribute some NPR content. So the number is 14,000, which is the number of corporate jobs Amazon says it'll soon be cutting. And one of the explicit reasons for trimming about 4% of its workforce is AI.",
+      "instructions": "Measured, journalistic clarity with crisp emphasis on '14,000' and 'AI'"
+    },
+    {
+      "voice": "persona_b",
+      "text": "So is the AI apocalypse here? Oh, they didn't say apocalypse in their statement?",
+      "instructions": "Curious and wryly amused, chuckling lightly on 'apocalypse'"
+    },
+    {
+      "voice": "persona_a",
+      "text": "Well, that's not quite the way that Amazon puts it. So in a statement to Amazon employees, a senior vice president named Beth Galetti said, quote, The world is changing quickly. This generation of AI is the most transformative technology we've seen since the internet. And it's enabling companies to innovate much faster than ever before. Dot, dot, dot. We are convinced that we need to be organized more leanly with fewer layers and more ownership, unquote.",
+      "instructions": "Even-toned news reading, shifting to a slightly stiff corporate-speak cadence for the quote"
+    },
+    {
+      "voice": "persona_b",
+      "text": "If I were a laid-off worker or I was worried about losing my job, this would not do anything for me, I have to say.",
+      "instructions": "Dry, skeptical, empathetic tone with slight exasperation"
+    },
+    {
+      "voice": "persona_a",
+      "text": "You mean being told that you're one of too many layers doesn't really give you the company spirit?",
+      "instructions": "Wry, tongue-in-cheek deadpan"
+    },
+    {
+      "voice": "persona_b",
+      "text": "Yeah, or like being like, oh, AI's allowing us to innovate so much faster. It's like, great. So I'm not going to have a job right before Thanksgiving? You know what I mean?",
+      "instructions": "Animated, sarcastic uptick on 'great', candid conversational frustration"
+    },
+    {
+      "voice": "persona_a",
+      "text": "Right. Well, you know, what Amazon is saying here, it actually reflects a wider pattern of what we're seeing from a lot of America's biggest companies. In recent weeks and months, we have seen companies like Salesforce, Accenture, and Goldman Sachs all announce thousands in layoffs, and at the same time, talking pretty optimistically about AI's potential to basically make up the difference. And a few weeks ago, the CEO of Walmart said it plans to freeze hiring for the next few years while it gets AI more integrated into its workforce.",
+      "instructions": null
+    },
+    {
+      "voice": "persona_b",
+      "text": "OK, so these are generating headlines, but what do the numbers say? Like, are these really making a difference in the wider workforce?",
+      "instructions": "Inquisitive, leaning in to challenge the headline narrative"
+    },
+    {
+      "voice": "persona_a",
+      "text": "There is a kind of interesting data point I saw from the St. Louis Fed. Some economists there did some research which suggests we might be in the early stages of AI-driven job displacement, which is especially hitting knowledge workers. At the same time, they say, you know, it's still early days, and the picture still could change. Like, who knows? Maybe in the long run, AI could actually create jobs.",
+      "instructions": "Thoughtful, nuanced, slightly cautious pacing"
+    },
+    {
+      "voice": "persona_b",
+      "text": "Or maybe companies will realize that they over-invested in AI, and then they actually need the humans back.",
+      "instructions": "Playfully pointed with a light chuckle at the end"
+    },
+    {
+      "voice": "persona_a",
+      "text": "That's my Indicator of the Week. Who wants to go next?",
+      "instructions": null
+    },
+    {
+      "voice": "persona_b",
+      "text": "All right. So I'll go next. My indicator is 1.1 percentile. That's the boost to grades that schools can get from banning cell phones. In other words, when school kids take the big spring test at the end of the school year, they can boost their placement nationally from, say, the 50th percentile to being a little over the 51st percentile on average.",
+      "instructions": "Clear, steady explanatory cadence, emphasizing '1.1 percentile'"
+    },
+    {
+      "voice": "persona_a",
+      "text": "So taking these pocket-sized distraction machines away from kids during the day helps them do better in school? I am shocked! Shocked, I say!",
+      "instructions": "Playfully deadpan sarcasm, laughing brightly on 'Shocked, I say!'"
+    },
+    {
+      "voice": "persona_b",
+      "text": "So it's not the largest effect overall, but it's from a working paper where the authors say the real effect might be higher. But this is the amount that they calculate, hand on heart, is due to cell phone bans. The authors did a really diligent job looking at Florida's ban on cell phones in schools in 2023. Florida had the country's first statewide ban on cell phones in school.",
+      "instructions": "Earnest, measured, emphasizing 'hand on heart' and 'really diligent job'"
+    },
+    {
+      "voice": "persona_a",
+      "text": "Wait, when you say they did a diligent job, what do you mean by that?",
+      "instructions": "Genuinely curious, conversational prompt"
+    },
+    {
+      "voice": "persona_b",
+      "text": "Yeah, so in science, you want a control group. You'd ideally randomly ban cell phones from some schools but not others, and see what the effect was. Now, that didn't happen. So the researchers had to be creative about what the control group was. They got data from a private company that tracks cell phones pinging cell phone towers, and they compared schools where the ban had a large effect on cell phone usage to schools with a low effect on cell phone usage because the students there weren't using phones much to begin with. These schools without much changes in cell phone use, this was kind of the control group. And then the authors basically looked at the grades of how the schools that were reducing cell phone usage a lot compared to how they did previously.",
+      "instructions": "Accessible, enthusiastic explainer tone breaking down the research method cleanly"
+    },
+    {
+      "voice": "persona_a",
+      "text": "Hmm. And then they found kind of this moderately happy ending, right? Slightly better grades. And that means that maybe these kids will be more productive in the future, less addicted to their phones.",
+      "instructions": "Warm, reflective, building toward a neat conclusion"
+    },
+    {
+      "voice": "persona_b",
+      "text": "Yes, a happy ending, but I've left out an important point. Schools that saw dramatic reductions in cell phone use also had big rises in suspensions the year after the ban.",
+      "instructions": "Conspiratorial pause before the twist, landing firmly on 'suspensions'"
+    },
+    {
+      "voice": "persona_a",
+      "text": "Uh-oh. Oh, 'cause like, they were punishing kids for trying to sneak their phones out?",
+      "instructions": "Quick surprised 'Uh-oh', then connecting the dots"
+    },
+    {
+      "voice": "persona_b",
+      "text": "That is the implication. Yeah, the schools with higher cell phone reductions also saw higher suspensions, though that seemed to settle back to normal after the first year, leaving only good trends, better attendance and higher grades.",
+      "instructions": "Balanced, reassuring resolution on 'only good trends'"
+    },
+    {
+      "voice": "persona_a",
+      "text": "I thought the suspensions were because of kids going through, like, cell phone withdrawal and just being super irritable.",
+      "instructions": "Dryly humorous, amused"
+    },
+    {
+      "voice": "persona_b",
+      "text": "That could be part of it, too, acting out. Well, speaking of children of the neighborhood getting up to no good, what's your indicator?",
+      "instructions": "Chuckling warmly, smooth playful segue to the next story"
+    },
+    {
+      "voice": "persona_a",
+      "text": "My indicator is 10.8%. That is the average increase in the price of Halloween candy from last year to this year.",
+      "instructions": "Bright, crisp delivery with a laugh at the start and punch on '10.8%'"
+    },
+    {
+      "voice": "persona_b",
+      "text": "Spook-flation. That's a pretty good hike.",
+      "instructions": "Quick playful pun 'Spook-flation', impressed"
+    },
+    {
+      "voice": "persona_a",
+      "text": "Yes, it's way over the baseline inflation rate. And this number crunching comes courtesy of the Groundwork Collaborative and the Century Foundation, which are left-leaning think tanks. They analyzed the prices of candy staples. So that's stuff like Tootsie Roll Pops are up 34% from last year. Candy made by Mars, so that's M&M, Skittles, some other brands, that's up 12%. And the Century Foundation blames these higher prices on tariffs. It says that most products made with cocoa got hit with tariffs between 15% and 39%. And that's because the majority of cocoa beans come from West Africa, and a lot of the processing is in Europe.",
+      "instructions": "Lively, brisk reporting with slight amused disbelief on '34%'"
+    },
+    {
+      "voice": "persona_b",
+      "text": "You know how there's, like, usually a house in the neighborhood that gives out toothbrushes and pennies? Like, maybe there will be more of those this year.",
+      "instructions": "Teasing, light conversational joke"
+    },
+    {
+      "voice": "persona_a",
+      "text": "Yeah. Not at my house, though. I'm holding the line. I'll show you what I got this year. Look at this. Look, it's bigger than my head! Yeah, I got three of these at Costco. It's a 5.6 pound variety pack. And it's got Snickers, Butterfingers, KitKats. It's like a pretty good assortment. And yeah, we get a ton of trick-or-treaters every year, so I got a little neurotic about having enough.",
+      "instructions": "Laughing with delight, animated show-and-tell energy holding up the giant candy bag"
+    },
+    {
+      "voice": "persona_b",
+      "text": "Fighting the good fight. Whoa! Did you end up spending more?",
+      "instructions": "Amused, genuinely impressed 'Whoa!', curious follow-up"
+    },
+    {
+      "voice": "persona_a",
+      "text": "OK, so I paid $23.99 for this bag. And I don't remember how much the Costco pack cost last year, but I found a YouTube video of someone who's kept tabs on this variety pack. And, I love YouTube. And they said that this year, there were 165 pieces of candy in here, compared with 169 last year. So even if the price stayed the same, this bag has less candy in it. And so that is shrinkflation! Shrinkflation strikes again.",
+      "instructions": "Giggling at the YouTube rabbit hole, then mock-dramatic flourish on 'Shrinkflation strikes again'"
+    },
+    {
+      "voice": "persona_b",
+      "text": "OK, but did you fact-check this YouTube video?",
+      "instructions": "Deadpan playful challenge"
+    },
+    {
+      "voice": "persona_a",
+      "text": "You know what? I will open this bag and count the candy right now, live, if you want.",
+      "instructions": "Bursting into laughter, playful defiance"
+    },
+    {
+      "voice": "persona_b",
+      "text": "So I hope everybody has a happy and safe Halloween. And before we go, just to let listeners know, I'm going to be taking some time off from the show. So you might not hear me very much for the next few months, but stepping in to help out here will be friend of the show, Stephen Bisaha of the Gulf States Newsroom. So look forward to hearing Stephen on the show. I'll see you before too long.",
+      "instructions": "Warm, heartfelt sign-off over upbeat closing music"
+    },
+    {
+      "voice": "persona_a",
+      "text": "This episode was produced by Angel Carreras with engineering by Ko Takasugi-Czernowin. It was fact-checked by Corey Bridges and Julia Ritchey. Kate Concannon edits the show. And The Indicator is a production of NPR.",
+      "instructions": "Crisp, friendly credits cadence"
+    }
+  ]
+}

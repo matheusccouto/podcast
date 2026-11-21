@@ -1,7 +1,6 @@
-"""DeepEval evaluations for Writer Script grounding and style."""
+"""DeepEval evaluations for Writer Script podcast craft and naturalness."""
 
 import asyncio
-import json
 from datetime import date
 from typing import cast
 
@@ -11,7 +10,7 @@ from deepeval.dataset import Golden
 from deepeval.metrics import BaseMetric
 from deepeval.test_case import LLMTestCase
 
-from evals.conftest import load_golden_dataset
+from evals.conftest import load_golden_dataset, serialize_turns
 from evals.golden import GoldenStory
 from podcast.agents import WriterContext, format_writer_prompt, llm_config, writer
 from podcast.models import CuratedStory, Dialogue
@@ -30,12 +29,12 @@ if not _DATASET.goldens:
     _DATASET.goldens,
     ids=lambda golden: golden.name or "golden",
 )
-def test_scriptwriter_matches_indicator_quality_bar(
+def test_scriptwriter_matches_podcast_quality_bar(
     golden: Golden,
     eval_settings: Settings,
     script_metrics: list[BaseMetric],
 ) -> None:
-    """Evaluate SpeechTurn grounding and style similarity via JevEval."""
+    """Evaluate Writer SpeechTurn podcast craft and naturalness via JevEval."""
     metadata = cast("dict[str, object]", golden.additional_metadata or {})
     raw_stories = cast("list[dict[str, object]]", metadata["stories"])
     golden_stories = [GoldenStory.model_validate(item) for item in raw_stories]
@@ -66,12 +65,6 @@ def test_scriptwriter_matches_indicator_quality_bar(
     test_case = LLMTestCase(
         name=golden.name,
         input=golden.input,
-        actual_output=json.dumps(
-            [turn.model_dump() for turn in dialogue.turns],
-            ensure_ascii=False,
-            indent=2,
-        ),
-        expected_output=golden.expected_output,
-        retrieval_context=golden.retrieval_context,
+        actual_output=serialize_turns(dialogue.turns),
     )
     assert_test(test_case, script_metrics)

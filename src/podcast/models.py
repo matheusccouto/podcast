@@ -78,7 +78,10 @@ class CuratedStory(_DomainModel):
 class SpeechTurn(_DomainModel):
     """Single spoken TTS turn for one Persona voice."""
 
-    voice: str = Field(min_length=1)
+    voice: str = Field(
+        min_length=1,
+        description="Exact Persona voice_id from the prompt (never the display name).",
+    )
     text: str
     instructions: str | None = Field(default=None, max_length=160)
 

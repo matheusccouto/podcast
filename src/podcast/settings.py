@@ -25,7 +25,7 @@ class Settings(BaseSettings):
         description="OpenRouter System One model ID for Curator ranking.",
     )
     llm_model: str = Field(
-        default="baidu/ernie-5.5-flash-preview:free",
+        default="deepseek/deepseek-v4.1-flash",
         description="OpenRouter LLM model ID.",
     )
     tts_model: str = Field(

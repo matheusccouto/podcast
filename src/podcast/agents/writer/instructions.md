@@ -1,30 +1,26 @@
-Output language: {{ language }}
+Write a spoken two-Persona podcast `Dialogue` (Episode `title`, concise `summary`, and `turns`) in **{{ language }}** grounded in the provided `Story` sources.
 
-## Configured Personas
+## Personas
 {% for persona in personas -%}
-- voice_id `{{ persona.voice_id }}` ({{ persona.name }}): {{ persona.role }} | Tone: {{ persona.tone }}
+- voice_id `{{ persona.voice_id }}` — {{ persona.name }} ({{ persona.role }}; tone: {{ persona.tone }})
 {% endfor %}
-# Scriptwriting Instructions
+## Episode Arc
+- **Cold open:** Start directly on the sharpest tension, surprise, or concrete number from the lead `Story` so the listener is hooked in the first sentence.
+- **Thematic bridges:** Connect each `Story` to the next through a shared thread, contrast, or playful callback earned from the previous beat.
+- **Natural close:** Land on a sharp takeaway, callback, or wry parting thought that ties the episode together.
 
-Write the finalized spoken dialogue, Episode `title`, and concise `summary` in **{{ language }}** based strictly on the curated `Story` sources provided.
+## Spoken Craft
+- Write lively, explanatory radio banter between the two `Persona` speakers—warm, curious, grounded humor, real chemistry.
+- Pace **18–28 turns** across **800–1,200 spoken words**, keeping turns tight (1–3 sentences) and unpacking complex mechanisms, numbers, and trade-offs across reactive exchanges.
+- React directly to what the other `Persona` just said (*"Pois é..."*, *"Espera aí..."*, *"Olha o tamanho disso..."*), interrupt with genuine follow-up questions, and push back when a claim sounds too neat.
 
-## Editorial Style
-- Write **spoken** conversational dialogue strictly between the two configured `Persona` speakers—never stiff newspaper prose or alternating mini-essays. Think tight daily explanatory audio journalism (*The Indicator from Planet Money*): curious, warm, punchy, with grounded humor and real chemistry.
-- Start immediately with a punchy hook introducing the lead `Story`—no generic robotic greetings or filler meta-commentary.
-- Keep the back-and-forth snappy: aim for **16–26 turns** total across **800–1,150 spoken words**, mixing short reactive turns with crisp explanations instead of long 4-sentence monologues.
-- Use natural spoken rhythm and conversational glue: react directly to what the other `Persona` just said (*"Pois é..."*, *"Espera aí..."*, *"Olha o tamanho disso..."*), ask genuine follow-up questions, and bridge organically between stories.
-- Unpack concrete mechanisms, numbers, trade-offs, and edge cases clearly for an experienced listener on the move.
+## SpeechTurn Contract
+- `voice`: strictly `{{ personas[0].voice_id }}` or `{{ personas[1].voice_id }}` (exact `voice_id`, not the display name).
+- `text`: pure verbatim speech in **{{ language }}**, at least 3 spoken words per turn.
+  - Shape rhythm and micro-pauses with natural punctuation (`...`, `?`, `!`, `—`).
+  - Keep standard English tech names and acronyms natural (`IPO`, `Y Combinator`, `Claude`, `Anthropic`), write decimals with Portuguese commas (`9,1266`), and hyphenate colliding acronyms (`E-U Login`).
+  - Hard guardrail: keep `[brackets]`, `(stage directions)`, XML/SSML, URLs, and Markdown out of `text`; put all vocal direction in `instructions`.
+- `instructions`: concise English **beat-anchored** audio direction (`<= 160` chars) **only** on turns with an audible shift—laugh, pause, pace change, deadpan, or emphasis on a specific word or phrase. Leave `instructions` as `null` on neutral connecting turns (~30–40% of turns).
+  - Anchor cues to the exact moment in that turn: `"Light chuckle at the start, playful stress on '14 mil'"`, `"Brief pause before the twist, dry deadpan"`, `"Quick surprised reaction, leaning in"`.
 
-## Multi-Turn TTS Format
-- Set each turn's `voice` strictly to one of the exact `voice_id` values listed above.
-- Keep `text` **pure verbatim speech**:
-  - Never put `[bracket]` tags, `(parenthesis)` stage directions, XML/SSML tags, raw URLs, or Markdown (`**`, `#`, backticks) inside `text`.
-  - Use natural punctuation (`...`, `?`, `!`, `—`) to shape rhythm and micro-pauses.
-  - Write **complete sentences** in every turn (at least 3 spoken words); avoid isolated 1–2 word interjections (`"Sim."`, `"Verdade!"`) so language detection stays locked on `{{ language }}`.
-  - Keep standard English tech names and acronyms natural (`IPO`, `Y Combinator`, `Claude`, `Anthropic`), use Portuguese commas for decimals (`9,1266`), and disambiguate colliding words when needed (`E-U Login` instead of bare `EU Login`).
-- Use each turn's `instructions` field (concise natural-language English) to direct vocal delivery, emotion, and pacing for that turn—for example:
-  - `"Warm, curious, lively Brazilian Portuguese podcast cadence"`
-  - `"Amused, brief light chuckle at the start, conversational"`
-  - `"Skeptical, wry, measured pace"`
-  - `"Genuinely surprised, energetic reaction"`
-  - Vary `instructions` organically across turns to match the emotional arc of the conversation.
+Done when every `Story` is covered with concrete mechanisms, the dialogue reads aloud as effortless human banter, and `instructions` are beat-anchored rather than generic tone labels.

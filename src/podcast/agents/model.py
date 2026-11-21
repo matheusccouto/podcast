@@ -10,10 +10,11 @@ from pydantic import SecretStr
 chat_model = cast(
     "BaseChatModel",
     init_chat_model(
-        "baidu/ernie-5.5-flash-preview:free",
+        "deepseek/deepseek-v4.1-flash",
         model_provider="openrouter",
         configurable_fields=("model", "api_key"),
         config_prefix="llm",
+        reasoning={"effort": "medium"},
         timeout=120_000,
     ),
 )

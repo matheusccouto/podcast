@@ -27,7 +27,7 @@ from deepeval.test_case import LLMTestCase, SingleTurnParams
 from pydantic import BaseModel, Field, SecretStr, ValidationError
 
 from evals.golden import CuratorGoldenCase, GoldenCase
-from podcast.models import MAX_CONTENT_CHARS
+from podcast.models import MAX_CONTENT_CHARS, SpeechTurn
 from podcast.settings import Settings
 
 _WRITER_GOLDEN_DIR = Path(__file__).parent / "golden" / "writer"
@@ -264,6 +264,15 @@ class NDCGAtKMetric(BaseMetric):
         return f"NDCG@{self.k}"
 
 
+def serialize_turns(turns: list[SpeechTurn]) -> str:
+    """Serialize SpeechTurn items into the canonical JSON payload used by evals."""
+    return json.dumps(
+        [turn.model_dump(exclude_none=True) for turn in turns],
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
 def load_golden_dataset() -> EvaluationDataset:
     """Load evals/golden/writer/*.json into a DeepEval EvaluationDataset."""
     goldens: list[Golden] = []
@@ -273,11 +282,7 @@ def load_golden_dataset() -> EvaluationDataset:
             Golden(
                 name=path.stem,
                 input=case.date.isoformat(),
-                expected_output=json.dumps(
-                    [turn.model_dump() for turn in case.expected_output],
-                    ensure_ascii=False,
-                    indent=2,
-                ),
+                expected_output=serialize_turns(case.expected_output),
                 retrieval_context=[
                     story.content[:MAX_CONTENT_CHARS] for story in case.stories
                 ],
@@ -334,64 +339,53 @@ def jev_judge(eval_settings: Settings) -> OpenRouterJevModel:
     )
 
 
-@pytest.fixture(scope="session")
-def script_metrics(jev_judge: OpenRouterJevModel) -> list[BaseMetric]:
-    """Provide reusable DeepEval JevEval grounding and similarity metrics."""
-    grounding = JevEval(
-        name="Source Grounding",
-        evaluation_params=[
-            SingleTurnParams.ACTUAL_OUTPUT,
-            SingleTurnParams.RETRIEVAL_CONTEXT,
-        ],
+def build_script_metrics(jev_judge: OpenRouterJevModel) -> list[BaseMetric]:
+    """Build reference-free JevEval metrics for generic podcast craft."""
+    podcast_craft = JevEval(
+        name="Podcast Craft & Naturalness",
+        evaluation_params=[SingleTurnParams.ACTUAL_OUTPUT],
         questions=[
             Noul(
-                "The key numbers and quantitative claims in actual_output are "
-                "supported by retrieval_context rather than invented.",
+                "actual_output reads like a genuine spoken two-Persona podcast "
+                "conversation with natural rhythm, reactive handoffs, and "
+                "conversational phrasing, rather than essay prose or "
+                "AI-generated filler (such as robotic transitions, sycophantic "
+                "agreements, or listicle recitation).",
             ),
             Noul(
-                "All named entities, mechanisms, and factual assertions in "
-                "actual_output align with retrieval_context without major "
-                "contradictions or hallucinations.",
+                "actual_output organizes its stories and narrative beats like a "
+                "produced podcast episode—with an engaging opening hook, clear "
+                "story progression, organic thematic transitions between ideas "
+                "(rather than mechanical signposting like 'moving on to topic "
+                "two' or 'in conclusion'), and a natural close.",
             ),
             Noul(
-                "actual_output synthesizes substantive details from the sources "
-                "in retrieval_context rather than generic filler.",
-            ),
-        ],
-        system_one_model=jev_judge,
-        threshold=0.5,
-    )
-    similarity = JevEval(
-        name="Indicator Style & Similarity",
-        evaluation_params=[
-            SingleTurnParams.ACTUAL_OUTPUT,
-            SingleTurnParams.EXPECTED_OUTPUT,
-        ],
-        questions=[
-            Noul(
-                "Accounting for localization into Brazilian Portuguese, "
-                "actual_output covers the core analytical ideas and story angle "
-                "of expected_output.",
-            ),
-            Noul(
-                "Both Persona speakers use natural spoken turns with genuine "
-                "back-and-forth handoffs and accessible explanations similar "
-                "to expected_output.",
+                "The turn-level vocal delivery `instructions` in actual_output "
+                "give specific, varied, moment-level audio direction (such as "
+                "laughs, pauses, emphasis on key words, or emotional shifts, "
+                "with neutral lines omitted), rather than missing, generic, or "
+                "boilerplate tone labels repeated across turns (like "
+                "'informative and professional tone' or 'enthusiastic tone').",
             ),
             Score(
-                "How closely does actual_output match expected_output in "
-                "pacing, explanatory clarity, conversational craft, and natural "
-                "turn-level vocal delivery `instructions` (accounting for "
-                "localization into pt-BR)?",
+                "Regardless of language or topic, how authentically does "
+                "actual_output read as a high-quality, human-hosted podcast "
+                "transcript?",
                 levels=[
-                    "Flat monologue or robotic turns lacking narrative flow or cues",
-                    "Accurate summary but stiffer or sparser delivery than reference",
-                    "Engaging two-Persona conversation with natural delivery cues",
-                    "Tight, vivid, broadcast-ready dialogue matching reference cadence",
+                    "Robotic, stiff, or unmistakably AI-generated summary",
+                    "Informative dialogue but noticeably scripted or formulaic",
+                    "Natural, engaging two-Persona conversation with solid flow",
+                    "Broadcast-ready podcast craft with vivid pacing and delivery",
                 ],
             ),
         ],
         system_one_model=jev_judge,
-        threshold=0.5,
+        threshold=0.7,
     )
-    return [grounding, similarity]
+    return [podcast_craft]
+
+
+@pytest.fixture(scope="session")
+def script_metrics(jev_judge: OpenRouterJevModel) -> list[BaseMetric]:
+    """Provide reusable DeepEval JevEval podcast-craft metrics."""
+    return build_script_metrics(jev_judge)
