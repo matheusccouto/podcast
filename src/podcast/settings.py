@@ -60,7 +60,7 @@ class Settings(BaseSettings):
         default=Path("dist"),
         description="Output directory for published RSS Feed and Episode files.",
     )
-    persona_a_voice_id: CliSuppress[str] = "Puck"
+    persona_a_voice_id: CliSuppress[str] = "Charon"
     persona_b_voice_id: CliSuppress[str] = "Aoede"
 
     @property
@@ -68,15 +68,26 @@ class Settings(BaseSettings):
         """Return the two configured co-speaker Personas."""
         return (
             Persona(
-                name="Rafael",
-                role="Senior systems engineer and curious skeptic",
-                tone="Clear, analytical, grounded humor",
+                name="Carlos",
+                role=(
+                    "Senior systems engineer and pragmatic skeptic who "
+                    "interrogates hype, traces incentives, and asks who pays "
+                    "the second-order cost"
+                ),
+                tone="Measured, sharp, dry deadpan humor, curious rather than cynical",
                 voice_id=self.persona_a_voice_id,
             ),
             Persona(
-                name="Beatriz",
-                role="AI and developer-tools builder",
-                tone="Warm, sharp storyteller who unpacks complex ideas",
+                name="Alice",
+                role=(
+                    "AI and developer-tools builder who spots why a "
+                    "breakthrough matters, unpacks complex mechanisms clearly, "
+                    "and brings hands-on curiosity"
+                ),
+                tone=(
+                    "Warm, breezy, quick-witted storyteller with contagious "
+                    "energy and plain-spoken clarity"
+                ),
                 voice_id=self.persona_b_voice_id,
             ),
         )
