@@ -72,6 +72,8 @@ def test_cli_applies_option_overrides(
             "custom/tts:free",
             "--podcast-language",
             "en-US",
+            "--podcast-owner-email",
+            "owner@example.com",
             "--podcast-dist-dir",
             str(dist_dir),
         ],
@@ -84,4 +86,5 @@ def test_cli_applies_option_overrides(
     assert getattr(invoked_settings, "llm_model", None) == "custom/llm:free"
     assert getattr(invoked_settings, "tts_model", None) == "custom/tts:free"
     assert getattr(invoked_settings, "podcast_language", None) == "en-US"
+    assert getattr(invoked_settings, "podcast_owner_email", None) == "owner@example.com"
     assert getattr(invoked_settings, "podcast_dist_dir", None) == dist_dir

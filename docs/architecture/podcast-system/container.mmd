@@ -8,7 +8,7 @@ C4Container
 
     System_Boundary(podcast, "Podcast System") {
         Container(cli, "Podcast CLI", "Python CLI / GitHub Actions", "Runs curation, scriptwriting, TTS synthesis & Feed publishing")
-        Container(pages, "GitHub Pages", "gh-pages static hosting", "Hosts feed.xml & Episode metadata JSON")
+        Container(pages, "GitHub Pages", "gh-pages static hosting", "Hosts feed.xml, Feed artwork & Episode metadata JSON")
         Container(releases, "GitHub Releases", "GitHub CDN assets", "Hosts Episode MP3 audio files")
     }
 
@@ -22,7 +22,7 @@ C4Container
     Rel(player, pages, "Polls feed.xml", "HTTPS")
     Rel(player, releases, "Streams MP3", "HTTPS")
 
-    Rel(cli, pages, "Deploys feed.xml & Episode JSON", "Git")
+    Rel(cli, pages, "Deploys feed.xml, Feed artwork & Episode JSON", "Git")
     Rel(cli, releases, "Uploads Episode MP3", "HTTPS")
     Rel(cli, sources, "Fetches Stories & comments", "HTTPS")
     Rel(cli, extractor, "Extracts article text", "HTTPS")

@@ -39,6 +39,10 @@ class Feed(BaseModel):
     description: str
     language: str
     author: str
+    owner_email: str
+    category: str
+    subcategory: str
+    cover_path: str
     base_url: str
     releases_base_url: str
     dist_dir: Path
@@ -51,10 +55,19 @@ class Feed(BaseModel):
             description=settings.podcast_description,
             language=settings.podcast_language,
             author=settings.podcast_author,
+            owner_email=settings.podcast_owner_email,
+            category=settings.podcast_category,
+            subcategory=settings.podcast_subcategory,
+            cover_path=settings.podcast_cover_path,
             base_url=settings.podcast_base_url,
             releases_base_url=settings.podcast_releases_base_url,
             dist_dir=settings.podcast_dist_dir,
         )
+
+    @property
+    def cover_url(self) -> str:
+        """Return the hosted master Feed cover URL."""
+        return f"{self.base_url.rstrip('/')}/{self.cover_path.lstrip('/')}"
 
     def publish(self, script: Script, audio: SynthesizedAudio) -> Episode:
         """Write Episode audio/metadata and regenerate newest-first feed.xml."""

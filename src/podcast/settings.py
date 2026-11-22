@@ -37,7 +37,7 @@ class Settings(BaseSettings):
         description="Target spoken Episode language (e.g. pt-BR).",
     )
     podcast_title: str = Field(
-        default="HN Daily BR",
+        default="Daily Diff em Português",
         description="RSS Feed title.",
     )
     podcast_description: str = Field(
@@ -46,7 +46,23 @@ class Settings(BaseSettings):
     )
     podcast_author: str = Field(
         default="Matheus Couto",
-        description="RSS iTunes author name.",
+        description="RSS iTunes author and owner name.",
+    )
+    podcast_owner_email: str = Field(
+        min_length=1,
+        description="Public RSS iTunes owner contact email.",
+    )
+    podcast_category: str = Field(
+        default="Technology",
+        description="RSS iTunes category.",
+    )
+    podcast_subcategory: str = Field(
+        default="Tech News",
+        description="RSS iTunes nested subcategory.",
+    )
+    podcast_cover_path: str = Field(
+        default="cover.jpg",
+        description="Master Feed cover path relative to the public base URL.",
     )
     podcast_base_url: str = Field(
         default="http://localhost:8000",
