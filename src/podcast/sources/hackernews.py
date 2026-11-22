@@ -14,7 +14,7 @@ from podcast.models import Story
 _DEFAULT_BASE_URL = "https://hacker-news.firebaseio.com/v0"
 _DEFAULT_FRONT_URL = "https://news.ycombinator.com/front"
 _REQUEST_TIMEOUT_SECONDS = 15.0
-_MAX_CONCURRENCY = 10
+_MAX_CONCURRENCY = 3
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
 _FRONT_ITEM_ID_RE = re.compile(r'<tr[^>]*class="athing[^"]*"[^>]*id="(\d+)"')
 
