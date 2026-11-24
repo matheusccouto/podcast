@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, CliSuppress, SettingsConfigDict
 
 from podcast.models import Persona
@@ -60,8 +60,30 @@ class Settings(BaseSettings):
         default=Path("dist"),
         description="Output directory for published RSS Feed and Episode files.",
     )
+    podcast_intro_path: Path | None = Field(
+        default=None,
+        description=(
+            "Optional static intro stinger audio path "
+            "(e.g. assets/intro.mp3). Omit to start Episodes with dialogue."
+        ),
+    )
+    podcast_outro_path: Path | None = Field(
+        default=None,
+        description=(
+            "Optional static outro stinger audio path "
+            "(e.g. assets/outro.mp3). Omit to end Episodes with dialogue."
+        ),
+    )
     persona_a_voice_id: CliSuppress[str] = "Charon"
     persona_b_voice_id: CliSuppress[str] = "Aoede"
+
+    @field_validator("podcast_intro_path", "podcast_outro_path", mode="before")
+    @classmethod
+    def _blank_path_is_unset(cls, value: object) -> object:
+        """Treat a blank env var (e.g. an unset CI variable) as no stinger."""
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
     @property
     def personas(self) -> tuple[Persona, Persona]:
