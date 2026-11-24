@@ -4,7 +4,7 @@ C4Component
     Boundary(upstream, "Upstream APIs") {
         System_Ext(sources, "News Sources", "Stories & comments")
         System_Ext(extractor, "Content Extractor", "Readable article text")
-        System_Ext(ai, "AI Provider", "LLM & TTS APIs")
+        System_Ext(ai, "AI Provider", "LLM, TTS & image APIs")
     }
 
     Container_Boundary(cli, "Podcast CLI (src/podcast/)") {
@@ -12,11 +12,12 @@ C4Component
         Component(ingestion, "Ingestion Adapters", "sources/, fetcher.py", "Source & ContentFetcher protocols and adapters")
         Component(agents, "Editorial Workflow", "agents/", "Workflow orchestrating nested Curator & Writer subagents")
         Component(tts, "Audio Synthesizer", "tts.py", "Multi-speaker TTS synthesis and normalized MP3 encoding")
-        Component(publishing, "Feed Publisher", "feed/", "Renders RSS 2.0 template and writes Episode JSON/MP3")
+        Component(cover, "Cover Generator", "cover/", "Generates 1400x1400 Episode JPEGs from the master cover reference")
+        Component(publishing, "Feed Publisher", "feed/", "Renders RSS 2.0 template and writes Episode JSON/MP3/cover")
     }
 
     Boundary(hosting, "GitHub & CI Hosting") {
-        Container(pages, "GitHub Pages", "gh-pages", "feed.xml & Episode JSON")
+        Container(pages, "GitHub Pages", "gh-pages", "feed.xml, Episode JSON & covers")
         Container(releases, "GitHub Releases", "CDN assets", "Episode MP3 files")
     }
 
@@ -27,8 +28,10 @@ C4Component
     Rel(agents, ai, "LLM inference", "HTTPS")
     Rel(entry, tts, "Synthesizes Script turns")
     Rel(tts, ai, "Multi-speaker PCM audio", "HTTPS")
-    Rel(entry, publishing, "Publishes Script + SynthesizedAudio")
-    Rel(publishing, pages, "Outputs feed.xml & JSON for Git deploy")
+    Rel(entry, cover, "Generates Episode cover")
+    Rel(cover, ai, "Image generation", "HTTPS")
+    Rel(entry, publishing, "Publishes Script + SynthesizedAudio + cover")
+    Rel(publishing, pages, "Outputs feed.xml, JSON & covers for Git deploy")
     Rel(publishing, releases, "Outputs Episode MP3 for upload")
 
     UpdateLayoutConfig($c4ShapeInRow="1", $c4BoundaryInRow="3")

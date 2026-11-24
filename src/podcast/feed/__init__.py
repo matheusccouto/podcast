@@ -56,13 +56,22 @@ class Feed(BaseModel):
             dist_dir=settings.podcast_dist_dir,
         )
 
-    def publish(self, script: Script, audio: SynthesizedAudio) -> Episode:
+    def publish(
+        self,
+        script: Script,
+        audio: SynthesizedAudio,
+        *,
+        cover_jpeg: bytes,
+    ) -> Episode:
         """Write Episode audio/metadata and regenerate newest-first feed.xml."""
         slug = script.published_at.isoformat()
         episodes_dir = self.dist_dir / "episodes"
         episodes_dir.mkdir(parents=True, exist_ok=True)
 
         (episodes_dir / f"{slug}.mp3").write_bytes(audio.mp3_bytes)
+
+        (episodes_dir / f"{slug}.jpg").write_bytes(cover_jpeg)
+        cover_url = f"{self.base_url.rstrip('/')}/episodes/{slug}.jpg"
 
         releases_base = self.releases_base_url.rstrip("/")
         episode = Episode(
@@ -72,6 +81,7 @@ class Feed(BaseModel):
             audio_url=f"{releases_base}/{slug}.mp3",
             byte_length=len(audio.mp3_bytes),
             duration_seconds=audio.duration_seconds,
+            cover_url=cover_url,
         )
         (episodes_dir / f"{slug}.json").write_text(
             episode.model_dump_json(indent=2),

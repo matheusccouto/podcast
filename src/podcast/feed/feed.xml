@@ -16,6 +16,7 @@
       <description>{{ item.episode.summary }}</description>
       <enclosure url="{{ item.episode.audio_url }}" length="{{ item.episode.byte_length }}" type="audio/mpeg" />
       <itunes:duration>{{ item.episode.duration_seconds }}</itunes:duration>
+      <itunes:image href="{{ item.episode.cover_url }}" />
     </item>
 {% endfor %}
   </channel>
