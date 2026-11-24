@@ -80,3 +80,36 @@ def test_feed_publish_writes_artifacts_and_orders_rss_newest_first(
     assert "<itunes:author>Matheus Couto</itunes:author>" in rss_xml
     assert 'type="audio/mpeg"' in rss_xml
     assert rss_xml.index("Dia Dois &amp; Kernel") < rss_xml.index("Dia Um")
+
+
+def test_feed_publish_writes_episode_cover_and_renders_item_itunes_image(
+    feed: Feed,
+    make_script: Callable[[date, str], Script],
+    tmp_path: Path,
+) -> None:
+    """Each covered Episode gets an `<itunes:image>` that survives feed rebuilds."""
+    dist_dir = tmp_path / "dist"
+    covered = feed.publish(
+        make_script(date(2026, 11, 14), "Dia Um"),
+        SynthesizedAudio(mp3_bytes=b"ID3day1audio", duration_seconds=310),
+        cover_jpeg=b"\xff\xd8\xff\xe0day-one-cover",
+    )
+    uncovered = feed.publish(
+        make_script(date(2026, 11, 15), "Dia Dois"),
+        SynthesizedAudio(mp3_bytes=b"ID3day2audio", duration_seconds=420),
+    )
+
+    cover_path = dist_dir / "episodes" / "2026-11-14.jpg"
+    assert cover_path.read_bytes() == b"\xff\xd8\xff\xe0day-one-cover"
+    assert (
+        covered.cover_url == "https://example.github.io/podcast/episodes/2026-11-14.jpg"
+    )
+    assert uncovered.cover_url is None
+
+    rss_xml = (dist_dir / "feed.xml").read_text(encoding="utf-8")
+    day_one_start = rss_xml.index("<title>Dia Um</title>")
+    day_one_item = rss_xml[day_one_start : rss_xml.index("</item>", day_one_start)]
+    day_two_start = rss_xml.index("<title>Dia Dois</title>")
+    day_two_item = rss_xml[day_two_start : rss_xml.index("</item>", day_two_start)]
+    assert f'<itunes:image href="{covered.cover_url}" />' in day_one_item
+    assert "<itunes:image" not in day_two_item

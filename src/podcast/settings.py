@@ -32,6 +32,14 @@ class Settings(BaseSettings):
         default="google/gemini-3.8-flash-tts",
         description="OpenRouter TTS model ID.",
     )
+    cover_model: str = Field(
+        default="google/gemini-nano-banana-2.1",
+        description="OpenRouter image model ID for per-Episode cover artwork.",
+    )
+    podcast_master_cover_path: Path = Field(
+        default=Path("static/cover.jpg"),
+        description="Master cover artwork used as the Episode style reference.",
+    )
     podcast_language: str = Field(
         default="pt-BR",
         description="Target spoken Episode language (e.g. pt-BR).",

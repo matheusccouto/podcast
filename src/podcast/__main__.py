@@ -10,6 +10,7 @@ from pydantic import Field
 from pydantic_settings import CliApp
 
 from podcast.agents import PodcastContext, PodcastState, llm_config, podcast_graph
+from podcast.cover import OpenRouterCover
 from podcast.feed import Feed
 from podcast.fetcher import ExaFetcher
 from podcast.models import Episode, Script, validate_persona_voices
@@ -54,7 +55,19 @@ async def run_daily(
         )
         audio = await tts.synthesize(script.turns, title=script.title)
 
-    return Feed.from_settings(resolved).publish(script, audio)
+        cover = OpenRouterCover(
+            api_key=resolved.openrouter_api_key,
+            master_cover_path=resolved.podcast_master_cover_path,
+            model=resolved.cover_model,
+            client=client,
+        )
+        cover_jpeg = await cover.generate(script)
+
+    return Feed.from_settings(resolved).publish(
+        script,
+        audio,
+        cover_jpeg=cover_jpeg,
+    )
 
 
 class PodcastCLI(Settings):

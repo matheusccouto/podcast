@@ -58,6 +58,7 @@ Namespaces are one honking great idea -- let's do more of those!
 │   ├── sources/            # Upstream Sources implementing Source (add new sources here)
 │   ├── fetcher.py          # Content extraction protocol and implementation
 │   ├── agents/             # Editorial workflow and nested subagent packages (add/remove here)
+│   ├── cover/              # Per-Episode cover artwork generation via OpenRouter
 │   ├── tts.py              # Audio synthesis and MP3 encoding
 │   └── feed/               # RSS 2.0 publisher and XML template
 └── tests/

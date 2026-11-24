@@ -181,3 +181,4 @@ class Episode(_DomainModel):
     audio_url: str
     byte_length: int
     duration_seconds: int
+    cover_url: str | None = None
