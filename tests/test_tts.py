@@ -2,7 +2,11 @@
 
 import json
 import math
+import re
+import shutil
 import struct
+import subprocess
+from pathlib import Path
 
 import httpx
 import pytest
@@ -13,6 +17,8 @@ from podcast.settings import Settings
 from podcast.tts import OpenRouterTTS
 
 _SAMPLE_VOICES = ("Puck", "Aoede")
+_LOUDNESS_TARGET_LUFS = -16.0
+_LUFS_RE = re.compile(r"I:\s+(-?\d+\.\d+) LUFS")
 
 
 @pytest.fixture(scope="module")
@@ -24,6 +30,54 @@ def sine_pcm_one_second() -> bytes:
         for i in range(sample_rate)
     ]
     return struct.pack(f"<{sample_rate}h", *samples)
+
+
+def _sine_pcm(amplitude: int, seconds: float) -> bytes:
+    """Generate s16le mono 440Hz PCM at the given amplitude and duration."""
+    sample_rate = 24_000
+    samples = [
+        round(amplitude * math.sin(2 * math.pi * 440 * i / sample_rate))
+        for i in range(int(sample_rate * seconds))
+    ]
+    return struct.pack(f"<{len(samples)}h", *samples)
+
+
+@pytest.fixture(scope="module")
+def quiet_pcm_six_seconds() -> bytes:
+    """Generate 6 seconds of quiet 440Hz mono s16le PCM for loudness checks."""
+    return _sine_pcm(400, 6)
+
+
+@pytest.fixture(scope="module")
+def nonstationary_pcm_six_seconds() -> bytes:
+    """Generate 1s loud then 5s quiet 440Hz PCM, the varying intensity speech has."""
+    return _sine_pcm(30_000, 1) + _sine_pcm(400, 5)
+
+
+def _measure_integrated_lufs(mp3_path: Path) -> float:
+    """Decode an MP3 through ffmpeg's ebur128 filter and return integrated LUFS."""
+    ffmpeg_bin = shutil.which("ffmpeg")
+    assert ffmpeg_bin is not None
+    result = subprocess.run(  # noqa: S603
+        [
+            ffmpeg_bin,
+            "-hide_banner",
+            "-nostats",
+            "-i",
+            str(mp3_path),
+            "-af",
+            "ebur128",
+            "-f",
+            "null",
+            "-",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    matches = _LUFS_RE.findall(result.stderr)
+    assert matches
+    return float(matches[-1])
 
 
 @pytest.fixture
@@ -108,6 +162,68 @@ async def test_synthesize_encodes_pcm_to_mp3_via_ffmpeg(
     ]
     assert audio.mp3_bytes[:3] == b"ID3"
     assert audio.duration_seconds == 1
+
+
+async def _synthesize_pcm_mp3(
+    turns: list[SpeechTurn],
+    pcm_bytes: bytes,
+    title: str,
+) -> SynthesizedAudio:
+    """Run the real synthesize path over mock-returned PCM bytes."""
+    transport = httpx.MockTransport(
+        lambda _req: httpx.Response(
+            200,
+            content=pcm_bytes,
+            headers={"content-type": "audio/pcm; rate=24000; channels=1"},
+        ),
+    )
+    async with httpx.AsyncClient(transport=transport) as client:
+        tts = OpenRouterTTS(api_key=SecretStr("unused"), client=client)
+        return await tts.synthesize(turns, title=title)
+
+
+async def test_synthesize_normalizes_quiet_audio_to_target_loudness(
+    sample_turns: list[SpeechTurn],
+    quiet_pcm_six_seconds: bytes,
+    tmp_path: Path,
+) -> None:
+    """Quiet PCM is encoded to an MP3 whose integrated loudness hits -16 LUFS."""
+    audio = await _synthesize_pcm_mp3(
+        sample_turns,
+        quiet_pcm_six_seconds,
+        "Teste Loudness",
+    )
+
+    mp3_path = tmp_path / "episode.mp3"
+    mp3_path.write_bytes(audio.mp3_bytes)
+
+    assert audio.duration_seconds == 6
+    assert _measure_integrated_lufs(mp3_path) == pytest.approx(
+        _LOUDNESS_TARGET_LUFS,
+        abs=1.0,
+    )
+
+
+async def test_synthesize_normalizes_nonstationary_audio_to_target_loudness(
+    sample_turns: list[SpeechTurn],
+    nonstationary_pcm_six_seconds: bytes,
+    tmp_path: Path,
+) -> None:
+    """Loud-then-quiet PCM still lands on -16 LUFS integrated, not -12.7."""
+    audio = await _synthesize_pcm_mp3(
+        sample_turns,
+        nonstationary_pcm_six_seconds,
+        "Teste Loudness Variavel",
+    )
+
+    mp3_path = tmp_path / "episode.mp3"
+    mp3_path.write_bytes(audio.mp3_bytes)
+
+    assert audio.duration_seconds == 6
+    assert _measure_integrated_lufs(mp3_path) == pytest.approx(
+        _LOUDNESS_TARGET_LUFS,
+        abs=1.0,
+    )
 
 
 async def test_synthesize_splits_batches_and_forwards_instructions(

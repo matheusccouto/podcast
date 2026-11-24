@@ -1,13 +1,16 @@
 """Multi-speaker TTS synthesis via OpenRouter and MP3 encoding."""
 
+import asyncio
+import json
 import logging
+import math
 import re
 import shutil
 from collections.abc import Sequence
 from contextlib import nullcontext
+from dataclasses import dataclass
 
 import httpx
-from ffmpeg.asyncio import FFmpeg
 from pydantic import SecretStr
 
 from podcast.models import SpeechTurn, SynthesizedAudio
@@ -17,8 +20,92 @@ logger = logging.getLogger(__name__)
 _REQUEST_TIMEOUT_SECONDS = 180.0
 _BATCH_PAUSE_SECONDS = 0.15
 _DEFAULT_MAX_BATCH_CHARS = 2_400
+LOUDNESS_TARGET_LUFS = -16.0
+LOUDNESS_TRUE_PEAK_DB = -1.5
+LOUDNESS_RANGE_LU = 11.0
+_LOUDNORM_BASE_FILTER = (
+    f"loudnorm=I={LOUDNESS_TARGET_LUFS}:"
+    f"TP={LOUDNESS_TRUE_PEAK_DB}:LRA={LOUDNESS_RANGE_LU}"
+)
+_LOUDNORM_MEASURE_FILTER = f"{_LOUDNORM_BASE_FILTER}:print_format=json"
+_LOUDNORM_JSON_RE = re.compile(r'\{[^{}]*"input_i"[^{}]*\}')
 _RATE_RE = re.compile(r"rate=(\d+)")
 _CHANNELS_RE = re.compile(r"channels=(\d+)")
+
+
+async def _run_ffmpeg(
+    ffmpeg_bin: str,
+    arguments: Sequence[str],
+    *,
+    stdin_bytes: bytes,
+) -> tuple[bytes, str]:
+    """Run ffmpeg once, feeding stdin_bytes and returning stdout and stderr."""
+    process = await asyncio.create_subprocess_exec(
+        ffmpeg_bin,
+        "-hide_banner",
+        "-nostats",
+        *arguments,
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout_bytes, stderr_bytes = await process.communicate(stdin_bytes)
+    stderr = stderr_bytes.decode("utf-8", errors="replace")
+    if process.returncode != 0:
+        msg = f"ffmpeg failed with exit code {process.returncode}: {stderr[-500:]}"
+        raise RuntimeError(msg)
+    return stdout_bytes, stderr
+
+
+@dataclass(frozen=True)
+class _LoudnessMeasurement:
+    """First-pass loudnorm statistics that drive the linear second pass."""
+
+    input_i: float
+    input_lra: float
+    input_tp: float
+    input_thresh: float
+    target_offset: float
+
+    @classmethod
+    def from_ffmpeg_stderr(cls, stderr: str) -> _LoudnessMeasurement:
+        """Parse the loudnorm JSON block that ffmpeg prints on stderr."""
+        match = _LOUDNORM_JSON_RE.search(stderr)
+        if match is None:
+            msg = (
+                f"loudnorm measurement JSON missing from ffmpeg stderr: {stderr[-500:]}"
+            )
+            raise ValueError(msg)
+        payload = json.loads(match.group(0))
+        values = {
+            "input_i": float(payload["input_i"]),
+            "input_lra": float(payload["input_lra"]),
+            "input_tp": float(payload["input_tp"]),
+            "input_thresh": float(payload["input_thresh"]),
+            "target_offset": float(payload["target_offset"]),
+        }
+        non_finite = [
+            name for name, value in values.items() if not math.isfinite(value)
+        ]
+        if non_finite:
+            msg = (
+                "loudnorm measured non-finite values "
+                f"({', '.join(non_finite)}); the PCM is likely digital silence"
+            )
+            raise ValueError(msg)
+        return cls(**values)
+
+    def linear_filter(self) -> str:
+        """Return the loudnorm filter string for the linear second pass."""
+        return (
+            f"{_LOUDNORM_BASE_FILTER}"
+            f":measured_I={self.input_i}"
+            f":measured_LRA={self.input_lra}"
+            f":measured_TP={self.input_tp}"
+            f":measured_thresh={self.input_thresh}"
+            f":offset={self.target_offset}"
+            ":linear=true"
+        )
 
 
 class OpenRouterTTS:
@@ -172,19 +259,73 @@ class OpenRouterTTS:
         channels: int,
         title: str,
     ) -> bytes:
-        """Encode s16le PCM bytes into loudnorm-normalized ID3v2.3 MP3 via ffmpeg."""
-        ffmpeg = (
-            FFmpeg(executable=ffmpeg_bin)
-            .option("y")
-            .input("pipe:0", f="s16le", ar=sample_rate, ac=channels)
-            .output(
-                "pipe:1",
-                {"codec:a": "libmp3lame", "b:a": "128k"},
-                af="loudnorm",
-                write_id3v2=1,
-                id3v2_version=3,
-                metadata=f"title={title}",
-                f="mp3",
-            )
+        """Encode s16le PCM into -16 LUFS normalized ID3v2.3 MP3 via ffmpeg."""
+        measurement = await OpenRouterTTS._measure_loudness(
+            ffmpeg_bin=ffmpeg_bin,
+            pcm_bytes=pcm_bytes,
+            sample_rate=sample_rate,
+            channels=channels,
         )
-        return await ffmpeg.execute(pcm_bytes)
+        arguments = [
+            "-y",
+            "-f",
+            "s16le",
+            "-ar",
+            str(sample_rate),
+            "-ac",
+            str(channels),
+            "-i",
+            "pipe:0",
+            "-codec:a",
+            "libmp3lame",
+            "-b:a",
+            "128k",
+            "-af",
+            measurement.linear_filter(),
+            "-write_id3v2",
+            "1",
+            "-id3v2_version",
+            "3",
+            "-metadata",
+            f"title={title}",
+            "-f",
+            "mp3",
+            "pipe:1",
+        ]
+        mp3_bytes, _ = await _run_ffmpeg(
+            ffmpeg_bin,
+            arguments,
+            stdin_bytes=pcm_bytes,
+        )
+        return mp3_bytes
+
+    @staticmethod
+    async def _measure_loudness(
+        *,
+        ffmpeg_bin: str,
+        pcm_bytes: bytes,
+        sample_rate: int,
+        channels: int,
+    ) -> _LoudnessMeasurement:
+        """Run the loudnorm analysis pass and return its measured statistics."""
+        arguments = [
+            "-f",
+            "s16le",
+            "-ar",
+            str(sample_rate),
+            "-ac",
+            str(channels),
+            "-i",
+            "pipe:0",
+            "-af",
+            _LOUDNORM_MEASURE_FILTER,
+            "-f",
+            "null",
+            "-",
+        ]
+        _, stderr = await _run_ffmpeg(
+            ffmpeg_bin,
+            arguments,
+            stdin_bytes=pcm_bytes,
+        )
+        return _LoudnessMeasurement.from_ffmpeg_stderr(stderr)
