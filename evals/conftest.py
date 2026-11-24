@@ -12,7 +12,7 @@ import pytest
 from deepeval.dataset import EvaluationDataset, Golden
 from deepeval.metrics import BaseMetric
 from deepeval.metrics.jev_eval import JevEval, Noul, Score
-from deepeval.models import DeepEvalBaseSystemOneModel
+from deepeval.models import DeepEvalBaseSystemOneModel, OpenRouterModel
 from deepeval.models.system_one.schema import (
     ChoiceAnswer,
     ChoiceQuestion,
@@ -26,7 +26,8 @@ from deepeval.models.system_one.schema import (
 from deepeval.test_case import LLMTestCase, SingleTurnParams
 from pydantic import BaseModel, Field, SecretStr, ValidationError
 
-from evals.golden import CuratorGoldenCase, GoldenCase
+from evals.cover import build_cover_metrics
+from evals.golden import CuratorGoldenCase, GoldenCase, load_dataset
 from podcast.models import MAX_CONTENT_CHARS, SpeechTurn
 from podcast.settings import Settings
 
@@ -35,6 +36,7 @@ _CURATOR_GOLDEN_DIR = Path(__file__).parent / "golden" / "curator"
 _LINE_COMMENT_RE = re.compile(r"//[^\n]*")
 _SYSTEM_ONE_URL = "https://openrouter.ai/api/v1/systemone"
 _DEFAULT_JEV_MODEL = "jev-1.14"
+_DEFAULT_COVER_JUDGE_MODEL = "google/gemini-3.8-flash"
 
 
 class _NoulPayload(BaseModel):
@@ -273,43 +275,41 @@ def serialize_turns(turns: list[SpeechTurn]) -> str:
     )
 
 
+def _writer_golden(path: Path) -> Golden:
+    """Parse one writer fixture into a Golden carrying its Stories."""
+    case = GoldenCase.model_validate_json(path.read_text(encoding="utf-8"))
+    return Golden(
+        name=path.stem,
+        input=case.date.isoformat(),
+        expected_output=serialize_turns(case.expected_output),
+        retrieval_context=[story.content[:MAX_CONTENT_CHARS] for story in case.stories],
+        additional_metadata={
+            "stories": [story.model_dump() for story in case.stories],
+        },
+    )
+
+
 def load_golden_dataset() -> EvaluationDataset:
     """Load evals/golden/writer/*.json into a DeepEval EvaluationDataset."""
-    goldens: list[Golden] = []
-    for path in sorted(_WRITER_GOLDEN_DIR.glob("*.json")):
-        case = GoldenCase.model_validate_json(path.read_text(encoding="utf-8"))
-        goldens.append(
-            Golden(
-                name=path.stem,
-                input=case.date.isoformat(),
-                expected_output=serialize_turns(case.expected_output),
-                retrieval_context=[
-                    story.content[:MAX_CONTENT_CHARS] for story in case.stories
-                ],
-                additional_metadata={
-                    "stories": [story.model_dump() for story in case.stories],
-                },
-            ),
-        )
-    return EvaluationDataset(goldens=goldens)
+    return load_dataset(_WRITER_GOLDEN_DIR, _writer_golden)
+
+
+def _curator_golden(path: Path) -> Golden | None:
+    """Parse one curator fixture, or None when it carries no labeled ranking."""
+    raw = _LINE_COMMENT_RE.sub("", path.read_text(encoding="utf-8"))
+    case = CuratorGoldenCase.model_validate_json(raw)
+    if not case.ranking:
+        return None
+    return Golden(
+        name=path.stem,
+        input=case.date.isoformat(),
+        expected_output=json.dumps(case.ranking),
+    )
 
 
 def load_curator_dataset() -> EvaluationDataset:
     """Load labeled evals/golden/curator/*.json files into an EvaluationDataset."""
-    goldens: list[Golden] = []
-    for path in sorted(_CURATOR_GOLDEN_DIR.glob("*.json")):
-        raw = _LINE_COMMENT_RE.sub("", path.read_text(encoding="utf-8"))
-        case = CuratorGoldenCase.model_validate_json(raw)
-        if not case.ranking:
-            continue
-        goldens.append(
-            Golden(
-                name=path.stem,
-                input=case.date.isoformat(),
-                expected_output=json.dumps(case.ranking),
-            ),
-        )
-    return EvaluationDataset(goldens=goldens)
+    return load_dataset(_CURATOR_GOLDEN_DIR, _curator_golden)
 
 
 @pytest.fixture(scope="session")
@@ -419,3 +419,18 @@ def build_script_metrics(jev_judge: OpenRouterJevModel) -> list[BaseMetric]:
 def script_metrics(jev_judge: OpenRouterJevModel) -> list[BaseMetric]:
     """Provide reusable DeepEval JevEval podcast-craft metrics."""
     return build_script_metrics(jev_judge)
+
+
+@pytest.fixture(scope="session")
+def cover_judge(eval_settings: Settings) -> OpenRouterModel:
+    """Provide a session-wide OpenRouter vision judge for cover evaluations."""
+    return OpenRouterModel(
+        model=os.environ.get("COVER_JUDGE_MODEL", _DEFAULT_COVER_JUDGE_MODEL),
+        api_key=eval_settings.openrouter_api_key.get_secret_value(),
+    )
+
+
+@pytest.fixture(scope="session")
+def cover_metrics(cover_judge: OpenRouterModel) -> list[BaseMetric]:
+    """Provide the multimodal orthography, thumbnail, and brand GEval rubrics."""
+    return build_cover_metrics(cover_judge)

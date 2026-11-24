@@ -25,7 +25,7 @@ uv run podcast
 ```bash
 uv run pytest                                  # Offline unit tests
 uv run pytest -m live                          # Live tests against external services
-uv run --env-file .env deepeval test run evals/ # Scriptwriter evaluations
+uv run --env-file .env deepeval test run evals/ # Scriptwriter, Curator & cover evaluations
 uvx ruff check . && uvx ruff format --check .  # Lint & format
 uvx ty check                                   # Typecheck
 ```

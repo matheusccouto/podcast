@@ -1,0 +1,39 @@
+{
+  "published_at": "2026-11-25",
+  "title": "IA e o mercado de trabalho",
+  "summary": "Novas evidências mostram que a adoção de IA muda a demanda por vagas de tecnologia e reacende o debate sobre produtividade.",
+  "language": "pt-BR",
+  "segments": [
+    {
+      "story_id": "nx-s1-5928512",
+      "title": "IA encolhe vagas tech",
+      "url": "https://example.com/ia-desemprego",
+      "key_facts": [
+        "Ocupações com maior exposição à IA registram alta no desemprego.",
+        "Funções de programação júnior sentem a mudança primeiro.",
+        "Economistas divergem sobre causalidade e efeito de longo prazo."
+      ]
+    },
+    {
+      "story_id": "nx-s1-5955533",
+      "title": "Código assistido vira rotina",
+      "url": "https://example.com/codigo-assistido",
+      "key_facts": [
+        "Equipes relatam ganhos de velocidade em tarefas repetitivas.",
+        "Revisão humana continua obrigatória em trechos críticos."
+      ]
+    }
+  ],
+  "turns": [
+    {
+      "voice": "Charon",
+      "text": "A correlação entre exposição à IA e desemprego ficou forte demais para ignorar.",
+      "instructions": "Dry, analytical tone"
+    },
+    {
+      "voice": "Aoede",
+      "text": "Mas correlação não é causalidade, e os economistas ainda discutem o que vem primeiro.",
+      "instructions": "Curious pushback, quick pace"
+    }
+  ]
+}

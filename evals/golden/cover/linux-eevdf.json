@@ -1,0 +1,39 @@
+{
+  "published_at": "2026-11-24",
+  "title": "O kernel troca de escalonador",
+  "summary": "O kernel Linux adota o EEVDF como escalonador padrão e muda a forma como o sistema distribui tempo de CPU.",
+  "language": "pt-BR",
+  "segments": [
+    {
+      "story_id": "nx-s1-5608388",
+      "title": "Kernel Linux muda escalonador",
+      "url": "https://example.com/linux-eevdf",
+      "key_facts": [
+        "O EEVDF substitui o CFS como escalonador padrão no kernel 6.20.",
+        "A mudança reduz a latência percebida em cargas interativas.",
+        "Distribuições devem migrar sem ajustes manuais de prioridade."
+      ]
+    },
+    {
+      "story_id": "nx-s1-5718446",
+      "title": "Rust ganha espaço no kernel",
+      "url": "https://example.com/rust-kernel",
+      "key_facts": [
+        "Drivers experimentais em Rust passam a ser compilados por padrão.",
+        "Mantenedores apontam ganho de segurança na gestão de memória."
+      ]
+    }
+  ],
+  "turns": [
+    {
+      "voice": "Charon",
+      "text": "O kernel Linux trocou o escalonador padrão e isso mexe com todo mundo que roda servidor.",
+      "instructions": "Measured, slightly skeptical opening"
+    },
+    {
+      "voice": "Aoede",
+      "text": "O EEVDF promete menos latência para cargas interativas sem exigir ajuste manual de prioridade.",
+      "instructions": "Bright, explanatory energy"
+    }
+  ]
+}
