@@ -7,6 +7,7 @@ from deepeval.metrics import BaseMetric, GEval
 from deepeval.models import DeepEvalBaseLLM
 from deepeval.test_case import LLMTestCase, MLLMImage, SingleTurnParams
 
+from evals.golden import load_dataset
 from podcast.cover import headline, render_prompt, to_square_jpeg
 from podcast.models import Script
 
@@ -99,22 +100,22 @@ _BRAND_STEPS = [
 ]
 
 
+def _cover_golden(path: Path) -> Golden:
+    """Parse one cover fixture Script into a Golden carrying its prompt."""
+    script = Script.model_validate_json(path.read_text(encoding="utf-8"))
+    return Golden(
+        name=path.stem,
+        input=render_prompt(script),
+        additional_metadata={
+            "script": script.model_dump(mode="json"),
+            "headline": headline(script),
+        },
+    )
+
+
 def load_cover_dataset() -> EvaluationDataset:
     """Load evals/golden/cover/*.json Scripts into a DeepEval EvaluationDataset."""
-    goldens: list[Golden] = []
-    for path in sorted(_COVER_GOLDEN_DIR.glob("*.json")):
-        script = Script.model_validate_json(path.read_text(encoding="utf-8"))
-        goldens.append(
-            Golden(
-                name=path.stem,
-                input=render_prompt(script),
-                additional_metadata={
-                    "script": script.model_dump(mode="json"),
-                    "headline": headline(script),
-                },
-            ),
-        )
-    return EvaluationDataset(goldens=goldens)
+    return load_dataset(_COVER_GOLDEN_DIR, _cover_golden)
 
 
 def build_cover_metrics(judge: DeepEvalBaseLLM) -> list[BaseMetric]:

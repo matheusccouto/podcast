@@ -15,12 +15,12 @@
       ]
     },
     {
-      "story_id": "nx-s1-5928512",
-      "title": "IA encolhe vagas tech",
-      "url": "https://example.com/ia-vagas",
+      "story_id": "nx-s1-5718446",
+      "title": "Rust ganha espaço no kernel",
+      "url": "https://example.com/rust-kernel",
       "key_facts": [
-        "Empresas de tecnologia revisam contratações para funções júnior.",
-        "Ferramentas de código assistido absorvem tarefas repetitivas."
+        "Drivers experimentais em Rust passam a ser compilados por padrão.",
+        "Mantenedores apontam ganho de segurança na gestão de memória."
       ]
     }
   ],

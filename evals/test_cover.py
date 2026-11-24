@@ -18,10 +18,11 @@ from podcast.settings import Settings
 
 _DATASET = load_cover_dataset()
 if not _DATASET.goldens:
-    pytest.skip(
-        "No Script fixtures in evals/golden/cover/.",
-        allow_module_level=True,
+    msg = (
+        "No Script fixtures in evals/golden/cover/: the cover eval suite has "
+        "nothing to evaluate."
     )
+    raise RuntimeError(msg)
 
 
 async def _generate_cover_case(

@@ -27,7 +27,7 @@ from deepeval.test_case import LLMTestCase, SingleTurnParams
 from pydantic import BaseModel, Field, SecretStr, ValidationError
 
 from evals.cover import build_cover_metrics
-from evals.golden import CuratorGoldenCase, GoldenCase
+from evals.golden import CuratorGoldenCase, GoldenCase, load_dataset
 from podcast.models import MAX_CONTENT_CHARS, SpeechTurn
 from podcast.settings import Settings
 
@@ -275,43 +275,41 @@ def serialize_turns(turns: list[SpeechTurn]) -> str:
     )
 
 
+def _writer_golden(path: Path) -> Golden:
+    """Parse one writer fixture into a Golden carrying its Stories."""
+    case = GoldenCase.model_validate_json(path.read_text(encoding="utf-8"))
+    return Golden(
+        name=path.stem,
+        input=case.date.isoformat(),
+        expected_output=serialize_turns(case.expected_output),
+        retrieval_context=[story.content[:MAX_CONTENT_CHARS] for story in case.stories],
+        additional_metadata={
+            "stories": [story.model_dump() for story in case.stories],
+        },
+    )
+
+
 def load_golden_dataset() -> EvaluationDataset:
     """Load evals/golden/writer/*.json into a DeepEval EvaluationDataset."""
-    goldens: list[Golden] = []
-    for path in sorted(_WRITER_GOLDEN_DIR.glob("*.json")):
-        case = GoldenCase.model_validate_json(path.read_text(encoding="utf-8"))
-        goldens.append(
-            Golden(
-                name=path.stem,
-                input=case.date.isoformat(),
-                expected_output=serialize_turns(case.expected_output),
-                retrieval_context=[
-                    story.content[:MAX_CONTENT_CHARS] for story in case.stories
-                ],
-                additional_metadata={
-                    "stories": [story.model_dump() for story in case.stories],
-                },
-            ),
-        )
-    return EvaluationDataset(goldens=goldens)
+    return load_dataset(_WRITER_GOLDEN_DIR, _writer_golden)
+
+
+def _curator_golden(path: Path) -> Golden | None:
+    """Parse one curator fixture, or None when it carries no labeled ranking."""
+    raw = _LINE_COMMENT_RE.sub("", path.read_text(encoding="utf-8"))
+    case = CuratorGoldenCase.model_validate_json(raw)
+    if not case.ranking:
+        return None
+    return Golden(
+        name=path.stem,
+        input=case.date.isoformat(),
+        expected_output=json.dumps(case.ranking),
+    )
 
 
 def load_curator_dataset() -> EvaluationDataset:
     """Load labeled evals/golden/curator/*.json files into an EvaluationDataset."""
-    goldens: list[Golden] = []
-    for path in sorted(_CURATOR_GOLDEN_DIR.glob("*.json")):
-        raw = _LINE_COMMENT_RE.sub("", path.read_text(encoding="utf-8"))
-        case = CuratorGoldenCase.model_validate_json(raw)
-        if not case.ranking:
-            continue
-        goldens.append(
-            Golden(
-                name=path.stem,
-                input=case.date.isoformat(),
-                expected_output=json.dumps(case.ranking),
-            ),
-        )
-    return EvaluationDataset(goldens=goldens)
+    return load_dataset(_CURATOR_GOLDEN_DIR, _curator_golden)
 
 
 @pytest.fixture(scope="session")

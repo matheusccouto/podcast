@@ -19,7 +19,7 @@ from evals.cover import (
 )
 from podcast.cover import render_prompt, to_square_jpeg
 from podcast.models import Script, Segment, SpeechTurn
-from tests.conftest import ONE_PIXEL_PNG, jpeg_size
+from tests.helpers import ONE_PIXEL_PNG, jpeg_size
 
 _METRIC_NAMES = [
     "Cover Orthography (pt-BR)",
@@ -164,17 +164,15 @@ def test_cover_dataset_loads_golden_scripts_and_their_prompts() -> None:
     dataset = load_cover_dataset()
 
     assert len(dataset.goldens) == 3
-    titles_by_story_id: dict[str, str] = {}
+    story_ids: list[str] = []
     for golden in dataset.goldens:
         assert isinstance(golden, Golden)
         metadata = golden.additional_metadata or {}
         script = Script.model_validate(metadata["script"])
         assert script.language == "pt-BR"
-        for segment in script.segments:
-            titles_by_story_id[segment.story_id] = segment.title
+        story_ids.extend(segment.story_id for segment in script.segments)
 
-    story_ids_by_title = {title: sid for sid, title in titles_by_story_id.items()}
-    assert len(story_ids_by_title) == len(titles_by_story_id)
+    assert len(story_ids) == len(set(story_ids))
 
 
 async def test_cover_case_embeds_full_cover_thumbnail_and_master(
