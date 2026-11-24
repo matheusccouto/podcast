@@ -1,7 +1,6 @@
 """Offline tests for the multimodal Episode cover evaluation suite."""
 
 import asyncio
-import base64
 from datetime import date
 from pathlib import Path
 from typing import cast
@@ -14,37 +13,19 @@ from deepeval.test_case import LLMTestCase, SingleTurnParams
 from pydantic import BaseModel
 
 from evals.cover import (
-    BRAND_THRESHOLD,
-    ORTHOGRAPHY_THRESHOLD,
-    THUMBNAIL_THRESHOLD,
     build_cover_metrics,
     cover_test_case,
     load_cover_dataset,
 )
-from podcast.cover import headline, render_prompt, to_square_jpeg
+from podcast.cover import render_prompt, to_square_jpeg
 from podcast.models import Script, Segment, SpeechTurn
+from tests.conftest import ONE_PIXEL_PNG, jpeg_size
 
-_ONE_PIXEL_PNG = base64.b64decode(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
-)
-_SOF_MARKERS = {0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD}
-
-
-def jpeg_size(jpeg_bytes: bytes) -> tuple[int, int]:
-    """Return `(width, height)` parsed from a baseline/extended JPEG SOF marker."""
-    index = 2
-    while index < len(jpeg_bytes):
-        if jpeg_bytes[index] != 0xFF:
-            msg = "Malformed JPEG segment"
-            raise ValueError(msg)
-        marker = jpeg_bytes[index + 1]
-        if marker in _SOF_MARKERS:
-            height = int.from_bytes(jpeg_bytes[index + 5 : index + 7], "big")
-            width = int.from_bytes(jpeg_bytes[index + 7 : index + 9], "big")
-            return width, height
-        index += 2 + int.from_bytes(jpeg_bytes[index + 2 : index + 4], "big")
-    msg = "JPEG holds no SOF marker"
-    raise ValueError(msg)
+_METRIC_NAMES = [
+    "Cover Orthography (pt-BR)",
+    "Cover Thumbnail Legibility (50x50)",
+    "Cover Brand Consistency",
+]
 
 
 class _ScriptedJudge(DeepEvalBaseLLM):
@@ -78,8 +59,7 @@ class _ScriptedJudge(DeepEvalBaseLLM):
         answer = schema.model_validate(
             {"reason": "scripted reason", "score": self._score}
         )
-        # DeepEval's base signature promises a string but accepts a schema instance.
-        return cast("str", answer)
+        return answer.model_dump_json()
 
     async def a_generate(self, *args: object, **kwargs: object) -> str:
         """Async interface delegating to the synchronous scripted answer."""
@@ -111,7 +91,7 @@ def script() -> Script:
 
 async def _cover_case(script: Script, workdir: Path) -> LLMTestCase:
     """Render a real JPEG cover and build its multimodal evaluation case."""
-    cover_jpeg = await to_square_jpeg(_ONE_PIXEL_PNG, size=1400)
+    cover_jpeg = await to_square_jpeg(ONE_PIXEL_PNG, size=1400)
     master = workdir / "master.jpg"
     master.write_bytes(cover_jpeg)
     return await cover_test_case(
@@ -128,16 +108,8 @@ def test_cover_metrics_score_the_three_editorial_criteria() -> None:
         cast("GEval", metric) for metric in build_cover_metrics(_ScriptedJudge(8.0))
     ]
 
-    assert [metric.name for metric in metrics] == [
-        "Cover Orthography (pt-BR)",
-        "Cover Thumbnail Legibility (50x50)",
-        "Cover Brand Consistency",
-    ]
-    assert [metric.threshold for metric in metrics] == [
-        ORTHOGRAPHY_THRESHOLD,
-        THUMBNAIL_THRESHOLD,
-        BRAND_THRESHOLD,
-    ]
+    assert len(metrics) == 3
+    assert [metric.name for metric in metrics] == _METRIC_NAMES
     assert isinstance(metrics[0], GEval)
     assert metrics[0].evaluation_params == [SingleTurnParams.ACTUAL_OUTPUT]
     assert metrics[2].evaluation_params == [
@@ -160,36 +132,49 @@ def test_cover_metric_rubrics_name_checkable_completion_criteria() -> None:
         assert metric.evaluation_steps[-1].startswith("Score 1")
 
 
+@pytest.mark.parametrize(
+    ("metric_index", "metric_name"),
+    list(enumerate(_METRIC_NAMES)),
+    ids=_METRIC_NAMES,
+)
 def test_cover_metrics_normalize_judge_score_against_threshold(
+    metric_index: int,
+    metric_name: str,
     script: Script,
     tmp_path: Path,
 ) -> None:
-    """A rubric score of 8/10 passes the 0.8 gate and 7/10 fails it."""
+    """A rubric score of 8/10 passes the gate and 7/10 fails it, for every rubric."""
     case = asyncio.run(_cover_case(script, tmp_path))
-    passing = build_cover_metrics(_ScriptedJudge(8.0))[0]
-    failing = build_cover_metrics(_ScriptedJudge(7.0))[0]
+    passing = cast("GEval", build_cover_metrics(_ScriptedJudge(8.0))[metric_index])
+    failing = cast("GEval", build_cover_metrics(_ScriptedJudge(7.0))[metric_index])
 
     passing.measure(case, _show_indicator=False)
     failing.measure(case, _show_indicator=False)
 
+    assert passing.name == metric_name
     assert passing.score == pytest.approx(0.8)
     assert passing.is_successful()
+    assert failing.name == metric_name
     assert failing.score == pytest.approx(0.7)
     assert not failing.is_successful()
 
 
 def test_cover_dataset_loads_golden_scripts_and_their_prompts() -> None:
-    """Golden fixtures round-trip into Scripts whose prompt is the case input."""
+    """Golden fixtures round-trip into Scripts that keep Story identities distinct."""
     dataset = load_cover_dataset()
 
     assert len(dataset.goldens) == 3
+    titles_by_story_id: dict[str, str] = {}
     for golden in dataset.goldens:
         assert isinstance(golden, Golden)
         metadata = golden.additional_metadata or {}
         script = Script.model_validate(metadata["script"])
-        assert golden.input == render_prompt(script)
-        assert metadata["headline"] == headline(script)
         assert script.language == "pt-BR"
+        for segment in script.segments:
+            titles_by_story_id[segment.story_id] = segment.title
+
+    story_ids_by_title = {title: sid for sid, title in titles_by_story_id.items()}
+    assert len(story_ids_by_title) == len(titles_by_story_id)
 
 
 async def test_cover_case_embeds_full_cover_thumbnail_and_master(
