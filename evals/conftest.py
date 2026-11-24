@@ -12,7 +12,7 @@ import pytest
 from deepeval.dataset import EvaluationDataset, Golden
 from deepeval.metrics import BaseMetric
 from deepeval.metrics.jev_eval import JevEval, Noul, Score
-from deepeval.models import DeepEvalBaseSystemOneModel
+from deepeval.models import DeepEvalBaseSystemOneModel, OpenRouterModel
 from deepeval.models.system_one.schema import (
     ChoiceAnswer,
     ChoiceQuestion,
@@ -26,6 +26,7 @@ from deepeval.models.system_one.schema import (
 from deepeval.test_case import LLMTestCase, SingleTurnParams
 from pydantic import BaseModel, Field, SecretStr, ValidationError
 
+from evals.cover import build_cover_metrics
 from evals.golden import CuratorGoldenCase, GoldenCase
 from podcast.models import MAX_CONTENT_CHARS, SpeechTurn
 from podcast.settings import Settings
@@ -35,6 +36,7 @@ _CURATOR_GOLDEN_DIR = Path(__file__).parent / "golden" / "curator"
 _LINE_COMMENT_RE = re.compile(r"//[^\n]*")
 _SYSTEM_ONE_URL = "https://openrouter.ai/api/v1/systemone"
 _DEFAULT_JEV_MODEL = "jev-1.14"
+_DEFAULT_COVER_JUDGE_MODEL = "google/gemini-3.8-flash"
 
 
 class _NoulPayload(BaseModel):
@@ -419,3 +421,18 @@ def build_script_metrics(jev_judge: OpenRouterJevModel) -> list[BaseMetric]:
 def script_metrics(jev_judge: OpenRouterJevModel) -> list[BaseMetric]:
     """Provide reusable DeepEval JevEval podcast-craft metrics."""
     return build_script_metrics(jev_judge)
+
+
+@pytest.fixture(scope="session")
+def cover_judge(eval_settings: Settings) -> OpenRouterModel:
+    """Provide a session-wide OpenRouter vision judge for cover evaluations."""
+    return OpenRouterModel(
+        model=os.environ.get("COVER_JUDGE_MODEL", _DEFAULT_COVER_JUDGE_MODEL),
+        api_key=eval_settings.openrouter_api_key.get_secret_value(),
+    )
+
+
+@pytest.fixture(scope="session")
+def cover_metrics(cover_judge: OpenRouterModel) -> list[BaseMetric]:
+    """Provide the multimodal orthography, thumbnail, and brand GEval rubrics."""
+    return build_cover_metrics(cover_judge)

@@ -1,0 +1,39 @@
+{
+  "published_at": "2026-11-26",
+  "title": "Tarifas e o custo do Halloween",
+  "summary": "Tarifas sobre doces e fantasias encarecem o Halloween e mostram como o custo de importação chega ao consumidor final.",
+  "language": "pt-BR",
+  "segments": [
+    {
+      "story_id": "nx-s1-6035794",
+      "title": "Tarifas encarecem Halloween",
+      "url": "https://example.com/tarifas-halloween",
+      "key_facts": [
+        "Doces importados ficaram quase 11% mais caros em um ano.",
+        "Fantasias e decorações dependem de insumos vindos da China.",
+        "Pequenos fabricantes repassam o custo ao consumidor."
+      ]
+    },
+    {
+      "story_id": "nx-s1-5591433",
+      "title": "Consumo perde fôlego",
+      "url": "https://example.com/consumo",
+      "key_facts": [
+        "Famílias reduzem gastos sazonais e buscam promoções.",
+        "Varejistas alertam para margens menores no fim do ano."
+      ]
+    }
+  ],
+  "turns": [
+    {
+      "voice": "Charon",
+      "text": "O preço do doce de Halloween subiu quase quatro vezes mais que a inflação geral.",
+      "instructions": "Deadpan, slightly amused"
+    },
+    {
+      "voice": "Aoede",
+      "text": "E a fantasia também pesa, porque quase tudo depende de insumo importado.",
+      "instructions": "Warm, conversational reaction"
+    }
+  ]
+}
