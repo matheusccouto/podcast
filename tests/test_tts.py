@@ -1,11 +1,13 @@
 """Tests for SpeechTurn validation and OpenRouterTTS encoding."""
 
+import itertools
 import json
 import math
 import re
 import shutil
 import struct
 import subprocess
+import wave
 from pathlib import Path
 
 import httpx
@@ -19,39 +21,42 @@ from podcast.tts import OpenRouterTTS
 _SAMPLE_VOICES = ("Puck", "Aoede")
 _LOUDNESS_TARGET_LUFS = -16.0
 _LUFS_RE = re.compile(r"I:\s+(-?\d+\.\d+) LUFS")
+_DECODE_SAMPLE_RATE = 24_000
 
 
-@pytest.fixture(scope="module")
-def sine_pcm_one_second() -> bytes:
-    """Generate 1 second of 440Hz mono s16le PCM audio for offline ffmpeg checks."""
-    sample_rate = 24_000
+def _sine_pcm(
+    seconds: float,
+    frequency: float,
+    *,
+    amplitude: int = 8000,
+    sample_rate: int = 24_000,
+) -> bytes:
+    """Build mono s16le PCM sine samples for offline audio tests."""
     samples = [
-        round(8000 * math.sin(2 * math.pi * 440 * i / sample_rate))
-        for i in range(sample_rate)
-    ]
-    return struct.pack(f"<{sample_rate}h", *samples)
-
-
-def _sine_pcm(amplitude: int, seconds: float) -> bytes:
-    """Generate s16le mono 440Hz PCM at the given amplitude and duration."""
-    sample_rate = 24_000
-    samples = [
-        round(amplitude * math.sin(2 * math.pi * 440 * i / sample_rate))
+        round(amplitude * math.sin(2 * math.pi * frequency * i / sample_rate))
         for i in range(int(sample_rate * seconds))
     ]
     return struct.pack(f"<{len(samples)}h", *samples)
 
 
 @pytest.fixture(scope="module")
+def sine_pcm_one_second() -> bytes:
+    """Generate 1 second of 440Hz mono s16le PCM audio for offline ffmpeg checks."""
+    return _sine_pcm(1.0, 440.0)
+
+
+@pytest.fixture(scope="module")
 def quiet_pcm_six_seconds() -> bytes:
     """Generate 6 seconds of quiet 440Hz mono s16le PCM for loudness checks."""
-    return _sine_pcm(400, 6)
+    return _sine_pcm(6.0, 440.0, amplitude=400)
 
 
 @pytest.fixture(scope="module")
 def nonstationary_pcm_six_seconds() -> bytes:
     """Generate 1s loud then 5s quiet 440Hz PCM, the varying intensity speech has."""
-    return _sine_pcm(30_000, 1) + _sine_pcm(400, 5)
+    return _sine_pcm(1.0, 440.0, amplitude=30_000) + _sine_pcm(
+        5.0, 440.0, amplitude=400
+    )
 
 
 def _measure_integrated_lufs(mp3_path: Path) -> float:
@@ -78,6 +83,64 @@ def _measure_integrated_lufs(mp3_path: Path) -> float:
     matches = _LUFS_RE.findall(result.stderr)
     assert matches
     return float(matches[-1])
+
+
+def _write_sine_wav(
+    path: Path,
+    *,
+    seconds: float,
+    frequency: float,
+    sample_rate: int = 24_000,
+) -> None:
+    """Write a mono 16-bit sine WAV fixture for stinger crossfade tests."""
+    with wave.open(str(path), "wb") as wav_file:
+        wav_file.setnchannels(1)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(sample_rate)
+        wav_file.writeframes(_sine_pcm(seconds, frequency, sample_rate=sample_rate))
+
+
+def _decode_mp3_samples(mp3_bytes: bytes) -> list[int]:
+    """Decode MP3 bytes to mono 24 kHz s16le samples for ordering assertions."""
+    ffmpeg_bin = shutil.which("ffmpeg")
+    assert ffmpeg_bin is not None
+    result = subprocess.run(  # noqa: S603
+        [
+            ffmpeg_bin,
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-i",
+            "pipe:0",
+            "-f",
+            "s16le",
+            "-ac",
+            "1",
+            "-ar",
+            str(_DECODE_SAMPLE_RATE),
+            "pipe:1",
+        ],
+        input=mp3_bytes,
+        check=True,
+        capture_output=True,
+    )
+    return list(struct.unpack(f"<{len(result.stdout) // 2}h", result.stdout))
+
+
+def _zero_crossing_frequency(
+    samples: list[int],
+    *,
+    sample_start: float,
+    sample_span: float,
+    sample_rate: int = 24_000,
+) -> float:
+    """Estimate the tone frequency of a window by counting zero crossings."""
+    start = int(sample_start * sample_rate)
+    window = samples[start : start + int(sample_span * sample_rate)]
+    crossings = sum(
+        1 for left, right in itertools.pairwise(window) if (left < 0) != (right < 0)
+    )
+    return crossings / (2 * sample_span)
 
 
 @pytest.fixture
@@ -312,6 +375,77 @@ async def test_synthesize_rejects_empty_pcm_audio(
         tts = OpenRouterTTS(api_key=SecretStr("unused"), client=client)
         with pytest.raises(ValueError, match="empty PCM"):
             await tts.synthesize(sample_turns, title="Empty PCM")
+
+
+async def test_synthesize_crossfades_intro_speech_and_outro(
+    sample_turns: list[SpeechTurn],
+    tmp_path: Path,
+) -> None:
+    """Decoded audio is 7s of crossfaded parts, not the 8s a concat would give."""
+    intro_path = tmp_path / "intro.wav"
+    outro_path = tmp_path / "outro.wav"
+    _write_sine_wav(intro_path, seconds=2.0, frequency=300.0)
+    _write_sine_wav(outro_path, seconds=3.0, frequency=700.0)
+    speech_pcm = _sine_pcm(3.0, 440.0)
+    transport = httpx.MockTransport(
+        lambda _req: httpx.Response(
+            200,
+            content=speech_pcm,
+            headers={"content-type": "audio/pcm; rate=24000; channels=1"},
+        ),
+    )
+
+    async with httpx.AsyncClient(transport=transport) as client:
+        tts = OpenRouterTTS(
+            api_key=SecretStr("unused"),
+            intro_path=intro_path,
+            outro_path=outro_path,
+            client=client,
+        )
+        audio = await tts.synthesize(sample_turns, title="Teste Stingers")
+
+    assert audio.mp3_bytes[:3] == b"ID3"
+    samples = _decode_mp3_samples(audio.mp3_bytes)
+    decoded_seconds = len(samples) / _DECODE_SAMPLE_RATE
+    # 2s intro + 3s speech + 3s outro is 8s of material; two 0.5s crossfades
+    # must bring the published episode down to 7s.
+    assert decoded_seconds == pytest.approx(7.0, rel=0.02)
+
+    mp3_path = tmp_path / "episode.mp3"
+    mp3_path.write_bytes(audio.mp3_bytes)
+    assert _measure_integrated_lufs(mp3_path) == pytest.approx(
+        _LOUDNESS_TARGET_LUFS,
+        abs=1.0,
+    )
+    assert _zero_crossing_frequency(
+        samples,
+        sample_start=0.25,
+        sample_span=0.5,
+    ) == pytest.approx(300.0, rel=0.05)
+    assert _zero_crossing_frequency(
+        samples,
+        sample_start=3.0,
+        sample_span=0.4,
+    ) == pytest.approx(440.0, rel=0.05)
+    assert _zero_crossing_frequency(
+        samples,
+        sample_start=6.0,
+        sample_span=0.5,
+    ) == pytest.approx(700.0, rel=0.05)
+
+
+async def test_synthesize_fails_loudly_when_stinger_file_is_missing(
+    sample_turns: list[SpeechTurn],
+    tmp_path: Path,
+) -> None:
+    """A configured stinger path that does not exist raises FileNotFoundError."""
+    tts = OpenRouterTTS(
+        api_key=SecretStr("unused"),
+        intro_path=tmp_path / "missing-intro.mp3",
+    )
+
+    with pytest.raises(FileNotFoundError, match="Stinger audio file not found"):
+        await tts.synthesize(sample_turns, title="Missing Stinger")
 
 
 @pytest.mark.live

@@ -6,9 +6,11 @@ import logging
 import math
 import re
 import shutil
+import tempfile
 from collections.abc import Sequence
 from contextlib import nullcontext
 from dataclasses import dataclass
+from pathlib import Path
 
 import httpx
 from pydantic import SecretStr
@@ -20,6 +22,8 @@ logger = logging.getLogger(__name__)
 _REQUEST_TIMEOUT_SECONDS = 180.0
 _BATCH_PAUSE_SECONDS = 0.15
 _DEFAULT_MAX_BATCH_CHARS = 2_400
+_STINGER_CROSSFADE_SECONDS = 0.5
+_S16LE_SAMPLE_BYTES = 2
 LOUDNESS_TARGET_LUFS = -16.0
 LOUDNESS_TRUE_PEAK_DB = -1.5
 LOUDNESS_RANGE_LU = 11.0
@@ -111,20 +115,24 @@ class _LoudnessMeasurement:
 class OpenRouterTTS:
     """Synthesizes multi-speaker SpeechTurns via OpenRouter and encodes MP3."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         *,
         api_key: SecretStr,
         model: str = "google/gemini-3.8-flash-tts",
         base_url: str = "https://openrouter.ai/api/v1",
         max_batch_chars: int = _DEFAULT_MAX_BATCH_CHARS,
+        intro_path: Path | None = None,
+        outro_path: Path | None = None,
         client: httpx.AsyncClient | None = None,
     ) -> None:
-        """Store OpenRouter credentials, TTS model identifier, and optional client."""
+        """Store credentials, TTS model, optional stinger assets, and client."""
         self.api_key = api_key
         self.model = model
         self.base_url = base_url.rstrip("/")
         self.max_batch_chars = max_batch_chars
+        self.intro_path = intro_path
+        self.outro_path = outro_path
         self.client = client
 
     def _batch_turns(self, turns: Sequence[SpeechTurn]) -> list[list[SpeechTurn]]:
@@ -161,6 +169,7 @@ class OpenRouterTTS:
         if ffmpeg_bin is None:
             msg = "ffmpeg binary not found in PATH"
             raise FileNotFoundError(msg)
+        self._require_stinger_files()
 
         batches = self._batch_turns(turns)
         pcm_chunks: list[bytes] = []
@@ -186,12 +195,34 @@ class OpenRouterTTS:
 
         assert audio_format is not None  # noqa: S101
         sample_rate, channels = audio_format
-        pause = b"\x00" * (int(sample_rate * _BATCH_PAUSE_SECONDS) * channels * 2)
+        pause = b"\x00" * (
+            int(sample_rate * _BATCH_PAUSE_SECONDS) * channels * _S16LE_SAMPLE_BYTES
+        )
         pcm_bytes = pause.join(pcm_chunks)
-        duration_seconds = round(len(pcm_bytes) / (sample_rate * channels * 2))
-        mp3_bytes = await self._encode_mp3(
+        intro_pcm = await self._decode_stinger_pcm(
+            ffmpeg_bin=ffmpeg_bin,
+            path=self.intro_path,
+            sample_rate=sample_rate,
+            channels=channels,
+        )
+        outro_pcm = await self._decode_stinger_pcm(
+            ffmpeg_bin=ffmpeg_bin,
+            path=self.outro_path,
+            sample_rate=sample_rate,
+            channels=channels,
+        )
+        mixed_pcm = await self._mix_stingers(
             ffmpeg_bin=ffmpeg_bin,
             pcm_bytes=pcm_bytes,
+            sample_rate=sample_rate,
+            channels=channels,
+            intro_pcm=intro_pcm,
+            outro_pcm=outro_pcm,
+        )
+        duration_seconds = round(_pcm_duration(mixed_pcm, sample_rate, channels))
+        mp3_bytes = await self._encode_mp3(
+            ffmpeg_bin=ffmpeg_bin,
+            pcm_bytes=mixed_pcm,
             sample_rate=sample_rate,
             channels=channels,
             title=title,
@@ -249,6 +280,96 @@ class OpenRouterTTS:
             )
             raise ValueError(msg)
         return pcm_bytes, sample_rate, channels
+
+    def _require_stinger_files(self) -> None:
+        """Raise FileNotFoundError when a configured intro or outro asset is absent."""
+        for path in (self.intro_path, self.outro_path):
+            if path is not None and not path.is_file():
+                msg = f"Stinger audio file not found: {path}"
+                raise FileNotFoundError(msg)
+
+    @staticmethod
+    async def _decode_stinger_pcm(
+        *,
+        ffmpeg_bin: str,
+        path: Path | None,
+        sample_rate: int,
+        channels: int,
+    ) -> bytes | None:
+        """Decode an optional stinger asset to s16le PCM in the dialogue format."""
+        if path is None:
+            return None
+        ffmpeg = (
+            FFmpeg(executable=ffmpeg_bin)
+            .option("y")
+            .input(str(path))
+            .output(
+                "pipe:1",
+                {
+                    "f": "s16le",
+                    "codec:a": "pcm_s16le",
+                    "ar": sample_rate,
+                    "ac": channels,
+                },
+            )
+        )
+        pcm_bytes = await ffmpeg.execute()
+        if not pcm_bytes:
+            msg = f"Stinger audio file decoded to empty PCM: {path}"
+            raise ValueError(msg)
+        return pcm_bytes
+
+    @staticmethod
+    async def _mix_stingers(  # noqa: PLR0913
+        *,
+        ffmpeg_bin: str,
+        pcm_bytes: bytes,
+        sample_rate: int,
+        channels: int,
+        intro_pcm: bytes | None,
+        outro_pcm: bytes | None,
+    ) -> bytes:
+        """Crossfade stingers onto the dialogue PCM; dialogue alone passes through."""
+        if intro_pcm is None and outro_pcm is None:
+            return pcm_bytes
+
+        with tempfile.TemporaryDirectory(prefix="podcast-stingers-") as temp_dir:
+            ffmpeg = FFmpeg(executable=ffmpeg_bin).option("y")
+            labels: list[str] = []
+            if intro_pcm is not None:
+                intro_file = Path(temp_dir) / "intro.raw"
+                intro_file.write_bytes(intro_pcm)
+                ffmpeg.input(str(intro_file), f="s16le", ar=sample_rate, ac=channels)
+                labels.append(f"[{len(labels)}:a]")
+            ffmpeg.input("pipe:0", f="s16le", ar=sample_rate, ac=channels)
+            labels.append(f"[{len(labels)}:a]")
+            if outro_pcm is not None:
+                outro_file = Path(temp_dir) / "outro.raw"
+                outro_file.write_bytes(outro_pcm)
+                ffmpeg.input(str(outro_file), f="s16le", ar=sample_rate, ac=channels)
+                labels.append(f"[{len(labels)}:a]")
+
+            filters: list[str] = []
+            previous = labels[0]
+            for position, label in enumerate(labels[1:], start=1):
+                crossfaded = f"[cf{position}]"
+                filters.append(
+                    f"{previous}{label}"
+                    f"acrossfade=d={_STINGER_CROSSFADE_SECONDS}{crossfaded}",
+                )
+                previous = crossfaded
+
+            ffmpeg.option("filter_complex", ";".join(filters)).output(
+                "pipe:1",
+                {
+                    "f": "s16le",
+                    "codec:a": "pcm_s16le",
+                    "ar": sample_rate,
+                    "ac": channels,
+                    "map": previous,
+                },
+            )
+            return await ffmpeg.execute(pcm_bytes)
 
     @staticmethod
     async def _encode_mp3(
@@ -329,3 +450,8 @@ class OpenRouterTTS:
             stdin_bytes=pcm_bytes,
         )
         return _LoudnessMeasurement.from_ffmpeg_stderr(stderr)
+
+
+def _pcm_duration(pcm_bytes: bytes, sample_rate: int, channels: int) -> float:
+    """Return the duration in seconds of s16le PCM bytes."""
+    return len(pcm_bytes) / (sample_rate * channels * _S16LE_SAMPLE_BYTES)

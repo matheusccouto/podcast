@@ -50,6 +50,8 @@ async def run_daily(
         tts = OpenRouterTTS(
             api_key=resolved.openrouter_api_key,
             model=resolved.tts_model,
+            intro_path=resolved.podcast_intro_path,
+            outro_path=resolved.podcast_outro_path,
             client=client,
         )
         audio = await tts.synthesize(script.turns, title=script.title)

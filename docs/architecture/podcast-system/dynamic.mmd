@@ -18,7 +18,7 @@ C4Dynamic
     Rel(curator, graph, "4. Return ranked Segments & CuratedStories")
     Rel(graph, writer, "5. Pass curated Stories & Persona context")
     Rel(writer, graph, "6. Return validated two-Persona Dialogue")
-    Rel(cli, tts, "7. Synthesize PCM & encode -16 LUFS loudnorm MP3")
+    Rel(cli, tts, "7. Synthesize PCM, crossfade intro/outro stingers & encode -16 LUFS loudnorm MP3")
     Rel(cli, feed, "8. Write Episode artifacts & render RSS Feed")
     Rel(feed, releases, "9. Upload Episode MP3 first")
     Rel(feed, pages, "10. Publish updated feed.xml & JSON")
