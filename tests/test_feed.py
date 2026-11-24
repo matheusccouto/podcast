@@ -13,6 +13,27 @@ from podcast.models import Script, Segment, SpeechTurn, SynthesizedAudio
 from podcast.settings import Settings
 
 _NAMESPACES = {"itunes": "http://www.itunes.com/dtds/podcast-1.0.dtd"}
+_FEED_SETTING_ENV_VARS = (
+    "PODCAST_TITLE",
+    "PODCAST_LANGUAGE",
+    "PODCAST_CATEGORY",
+    "PODCAST_SUBCATEGORY",
+    "PODCAST_COVER_PATH",
+    "PODCAST_BASE_URL",
+)
+
+
+@pytest.fixture
+def feed_settings(monkeypatch: pytest.MonkeyPatch) -> Settings:
+    """Build Settings with test API keys after removing ambient Feed settings."""
+    for name in _FEED_SETTING_ENV_VARS:
+        monkeypatch.delenv(name, raising=False)
+    return Settings(
+        openrouter_api_key=SecretStr("test-openrouter-key"),
+        exa_api_key=SecretStr("test-exa-key"),
+        podcast_owner_email="owner@example.com",
+        _env_file=None,
+    )
 
 
 @pytest.fixture
@@ -91,26 +112,9 @@ def test_feed_publish_writes_artifacts_and_orders_rss_newest_first(
     assert rss_xml.index("Dia Dois &amp; Kernel") < rss_xml.index("Dia Um")
 
 
-def test_feed_from_settings_uses_daily_diff_defaults(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_feed_from_settings_uses_daily_diff_defaults(feed_settings: Settings) -> None:
     """Feed.from_settings maps the rebranded identity and directory metadata."""
-    for name in (
-        "PODCAST_TITLE",
-        "PODCAST_LANGUAGE",
-        "PODCAST_CATEGORY",
-        "PODCAST_SUBCATEGORY",
-        "PODCAST_COVER_PATH",
-    ):
-        monkeypatch.delenv(name, raising=False)
-    settings = Settings(
-        openrouter_api_key=SecretStr("test-openrouter-key"),
-        exa_api_key=SecretStr("test-exa-key"),
-        podcast_owner_email="owner@example.com",
-        _env_file=None,
-    )
-
-    feed = Feed.from_settings(settings)
+    feed = Feed.from_settings(feed_settings)
 
     assert feed.title == "Daily Diff em Português"
     assert feed.language == "pt-BR"
@@ -166,15 +170,11 @@ def test_feed_renders_required_itunes_metadata_and_summary_only(
     assert descriptions == ["Resumo tecnico do dia."]
 
 
-def test_default_cover_path_resolves_to_staged_static_artwork() -> None:
+def test_default_cover_path_resolves_to_staged_static_artwork(
+    feed_settings: Settings,
+) -> None:
     """The iTunes image href points at artwork the Pages deployment actually ships."""
-    settings = Settings(
-        openrouter_api_key=SecretStr("test-openrouter-key"),
-        exa_api_key=SecretStr("test-exa-key"),
-        podcast_owner_email="owner@example.com",
-        _env_file=None,
-    )
-    feed = Feed.from_settings(settings)
+    feed = Feed.from_settings(feed_settings)
     static_dir = Path(__file__).resolve().parents[1] / "static"
 
     assert (static_dir / feed.cover_path).is_file()

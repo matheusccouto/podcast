@@ -35,6 +35,7 @@ _CURATOR_GOLDEN_DIR = Path(__file__).parent / "golden" / "curator"
 _LINE_COMMENT_RE = re.compile(r"//[^\n]*")
 _SYSTEM_ONE_URL = "https://openrouter.ai/api/v1/systemone"
 _DEFAULT_JEV_MODEL = "jev-1.14"
+_EVAL_KEY_FIELDS = frozenset({"openrouter_api_key", "exa_api_key"})
 
 
 class _NoulPayload(BaseModel):
@@ -320,14 +321,21 @@ def curator_metrics() -> list[BaseMetric]:
 
 @pytest.fixture(scope="session")
 def eval_settings() -> Settings:
-    """Build Settings with canonical golden voice IDs for scriptwriter evals."""
+    """Build Settings for evals, skipping only when live API keys are unset."""
     try:
         return Settings(
+            podcast_owner_email="owner@example.com",
             persona_a_voice_id="persona_a",
             persona_b_voice_id="persona_b",
         )
-    except ValidationError:
-        pytest.skip("OPENROUTER_API_KEY not configured for evals")
+    except ValidationError as error:
+        missing = {
+            detail["loc"][0] for detail in error.errors() if detail["type"] == "missing"
+        }
+        if not missing or not missing <= _EVAL_KEY_FIELDS:
+            raise
+        reason = ", ".join(sorted(map(str, missing)))
+        pytest.skip(f"live API keys not configured for evals: {reason}")
 
 
 @pytest.fixture(scope="session")
