@@ -11,7 +11,6 @@ from contextlib import nullcontext
 from dataclasses import dataclass
 
 import httpx
-from ffmpeg.asyncio import FFmpeg
 from pydantic import SecretStr
 
 from podcast.models import SpeechTurn, SynthesizedAudio
@@ -32,6 +31,30 @@ _LOUDNORM_MEASURE_FILTER = f"{_LOUDNORM_BASE_FILTER}:print_format=json"
 _LOUDNORM_JSON_RE = re.compile(r'\{[^{}]*"input_i"[^{}]*\}')
 _RATE_RE = re.compile(r"rate=(\d+)")
 _CHANNELS_RE = re.compile(r"channels=(\d+)")
+
+
+async def _run_ffmpeg(
+    ffmpeg_bin: str,
+    arguments: Sequence[str],
+    *,
+    stdin_bytes: bytes,
+) -> tuple[bytes, str]:
+    """Run ffmpeg once, feeding stdin_bytes and returning stdout and stderr."""
+    process = await asyncio.create_subprocess_exec(
+        ffmpeg_bin,
+        "-hide_banner",
+        "-nostats",
+        *arguments,
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout_bytes, stderr_bytes = await process.communicate(stdin_bytes)
+    stderr = stderr_bytes.decode("utf-8", errors="replace")
+    if process.returncode != 0:
+        msg = f"ffmpeg failed with exit code {process.returncode}: {stderr[-500:]}"
+        raise RuntimeError(msg)
+    return stdout_bytes, stderr
 
 
 @dataclass(frozen=True)
@@ -243,21 +266,38 @@ class OpenRouterTTS:
             sample_rate=sample_rate,
             channels=channels,
         )
-        ffmpeg = (
-            FFmpeg(executable=ffmpeg_bin)
-            .option("y")
-            .input("pipe:0", f="s16le", ar=sample_rate, ac=channels)
-            .output(
-                "pipe:1",
-                {"codec:a": "libmp3lame", "b:a": "128k"},
-                af=measurement.linear_filter(),
-                write_id3v2=1,
-                id3v2_version=3,
-                metadata=f"title={title}",
-                f="mp3",
-            )
+        arguments = [
+            "-y",
+            "-f",
+            "s16le",
+            "-ar",
+            str(sample_rate),
+            "-ac",
+            str(channels),
+            "-i",
+            "pipe:0",
+            "-codec:a",
+            "libmp3lame",
+            "-b:a",
+            "128k",
+            "-af",
+            measurement.linear_filter(),
+            "-write_id3v2",
+            "1",
+            "-id3v2_version",
+            "3",
+            "-metadata",
+            f"title={title}",
+            "-f",
+            "mp3",
+            "pipe:1",
+        ]
+        mp3_bytes, _ = await _run_ffmpeg(
+            ffmpeg_bin,
+            arguments,
+            stdin_bytes=pcm_bytes,
         )
-        return await ffmpeg.execute(pcm_bytes)
+        return mp3_bytes
 
     @staticmethod
     async def _measure_loudness(
@@ -268,10 +308,7 @@ class OpenRouterTTS:
         channels: int,
     ) -> _LoudnessMeasurement:
         """Run the loudnorm analysis pass and return its measured statistics."""
-        command = [
-            ffmpeg_bin,
-            "-hide_banner",
-            "-nostats",
+        arguments = [
             "-f",
             "s16le",
             "-ar",
@@ -286,18 +323,9 @@ class OpenRouterTTS:
             "null",
             "-",
         ]
-        process = await asyncio.create_subprocess_exec(
-            *command,
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.PIPE,
+        _, stderr = await _run_ffmpeg(
+            ffmpeg_bin,
+            arguments,
+            stdin_bytes=pcm_bytes,
         )
-        _, stderr_bytes = await process.communicate(pcm_bytes)
-        stderr = stderr_bytes.decode("utf-8", errors="replace")
-        if process.returncode != 0:
-            msg = (
-                "ffmpeg loudness measurement failed with exit code "
-                f"{process.returncode}: {stderr[-500:]}"
-            )
-            raise RuntimeError(msg)
         return _LoudnessMeasurement.from_ffmpeg_stderr(stderr)
