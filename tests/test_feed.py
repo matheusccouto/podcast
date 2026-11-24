@@ -3,24 +3,57 @@
 from collections.abc import Callable
 from datetime import date
 from pathlib import Path
+from xml.etree import ElementTree as ET
 
 import pytest
+from pydantic import SecretStr
 
 from podcast.feed import Feed
 from podcast.models import Script, Segment, SpeechTurn, SynthesizedAudio
+from podcast.settings import Settings
+
+_NAMESPACES = {"itunes": "http://www.itunes.com/dtds/podcast-1.0.dtd"}
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_FEED_SETTING_ENV_VARS = (
+    "PODCAST_TITLE",
+    "PODCAST_LANGUAGE",
+    "PODCAST_CATEGORY",
+    "PODCAST_SUBCATEGORY",
+    "PODCAST_COVER_PATH",
+    "PODCAST_BASE_URL",
+    "PODCAST_STATIC_DIR",
+)
+
+
+@pytest.fixture
+def feed_settings(monkeypatch: pytest.MonkeyPatch) -> Settings:
+    """Build Settings with test API keys after removing ambient Feed settings."""
+    for name in _FEED_SETTING_ENV_VARS:
+        monkeypatch.delenv(name, raising=False)
+    return Settings(
+        openrouter_api_key=SecretStr("test-openrouter-key"),
+        exa_api_key=SecretStr("test-exa-key"),
+        podcast_owner_email="owner@example.com",
+        _env_file=None,
+    )
 
 
 @pytest.fixture
 def feed(tmp_path: Path) -> Feed:
     """Create a Feed publisher writing artifacts into a temporary dist directory."""
     return Feed(
-        title="HN Daily BR",
+        title="Daily Diff em Português",
         description="Resumo diário de tecnologia.",
         language="pt-BR",
         author="Matheus Couto",
+        owner_email="owner@example.com",
+        category="Technology",
+        subcategory="Tech News",
+        cover_path="cover.jpg",
         base_url="https://example.github.io/podcast",
         releases_base_url="https://github.com/u/r/releases/download/latest",
         dist_dir=tmp_path / "dist",
+        static_dir=_REPO_ROOT / "static",
     )
 
 
@@ -67,6 +100,9 @@ def test_feed_publish_writes_artifacts_and_orders_rss_newest_first(
 
     assert (dist_dir / "episodes" / "2026-11-15.mp3").read_bytes() == b"ID3day2audio"
     assert (dist_dir / "episodes" / "2026-11-15.json").exists()
+    assert (dist_dir / "cover.jpg").read_bytes() == (
+        _REPO_ROOT / "static" / "cover.jpg"
+    ).read_bytes()
     assert (
         ep1.audio_url
         == "https://github.com/u/r/releases/download/latest/2026-11-14.mp3"
@@ -75,8 +111,95 @@ def test_feed_publish_writes_artifacts_and_orders_rss_newest_first(
     assert ep2.byte_length == len(b"ID3day2audio")
 
     rss_xml = (dist_dir / "feed.xml").read_text(encoding="utf-8")
-    assert "<title>HN Daily BR</title>" in rss_xml
+    assert "<title>Daily Diff em Português</title>" in rss_xml
     assert "<title>Dia Dois &amp; Kernel</title>" in rss_xml
     assert "<itunes:author>Matheus Couto</itunes:author>" in rss_xml
     assert 'type="audio/mpeg"' in rss_xml
     assert rss_xml.index("Dia Dois &amp; Kernel") < rss_xml.index("Dia Um")
+
+
+def test_feed_from_settings_uses_daily_diff_defaults(feed_settings: Settings) -> None:
+    """Feed.from_settings maps the rebranded identity and directory metadata."""
+    feed = Feed.from_settings(feed_settings)
+
+    assert feed.title == "Daily Diff em Português"
+    assert feed.language == "pt-BR"
+    assert feed.owner_email == "owner@example.com"
+    assert feed.category == "Technology"
+    assert feed.subcategory == "Tech News"
+    assert feed.cover_url == "http://localhost:8000/cover.jpg"
+
+
+def test_feed_renders_required_itunes_metadata_and_summary_only(
+    feed: Feed,
+    make_script: Callable[[date, str], Script],
+    tmp_path: Path,
+) -> None:
+    """Rendered RSS follows the iTunes channel and Episode description contract."""
+    feed.publish(
+        make_script(date(2026, 11, 15), "Dia Dois & Kernel"),
+        SynthesizedAudio(mp3_bytes=b"ID3day2audio", duration_seconds=420),
+    )
+    rss_xml = (tmp_path / "dist" / "feed.xml").read_text(encoding="utf-8")
+    # The XML is generated locally by Feed.publish, not untrusted input.
+    root = ET.fromstring(rss_xml)  # noqa: S314
+    channel = root.find("channel")
+    assert channel is not None
+
+    owner_path = "itunes:owner"
+    assert channel.findtext(f"{owner_path}/itunes:name", namespaces=_NAMESPACES) == (
+        "Matheus Couto"
+    )
+    assert (
+        channel.findtext(
+            f"{owner_path}/itunes:email",
+            namespaces=_NAMESPACES,
+        )
+        == "owner@example.com"
+    )
+
+    category = channel.find("itunes:category", namespaces=_NAMESPACES)
+    assert category is not None
+    assert category.attrib == {"text": "Technology"}
+    subcategory = category.find("itunes:category", namespaces=_NAMESPACES)
+    assert subcategory is not None
+    assert subcategory.attrib == {"text": "Tech News"}
+
+    assert channel.findtext("itunes:type", namespaces=_NAMESPACES) == "episodic"
+    image = channel.find("itunes:image", namespaces=_NAMESPACES)
+    assert image is not None
+    assert image.attrib == {
+        "href": "https://example.github.io/podcast/cover.jpg",
+    }
+
+    descriptions = [item.findtext("description") for item in channel.findall("item")]
+    assert descriptions == ["Resumo tecnico do dia."]
+
+
+def test_default_cover_path_resolves_to_staged_static_artwork(
+    feed_settings: Settings,
+) -> None:
+    """The iTunes image href points at artwork the Pages deployment actually ships."""
+    feed = Feed.from_settings(feed_settings)
+    static_dir = Path(__file__).resolve().parents[1] / "static"
+
+    assert (static_dir / feed.cover_path).is_file()
+
+
+def test_publish_fails_before_writing_feed_when_cover_artwork_is_missing(
+    feed: Feed,
+    make_script: Callable[[date, str], Script],
+    tmp_path: Path,
+) -> None:
+    """Publish refuses to emit feed.xml when the cover is absent from static_dir."""
+    empty_static = tmp_path / "static-without-cover"
+    empty_static.mkdir()
+    coverless = feed.model_copy(update={"static_dir": empty_static})
+
+    with pytest.raises(FileNotFoundError, match=r"cover\.jpg"):
+        coverless.publish(
+            make_script(date(2026, 11, 15), "Dia Dois & Kernel"),
+            SynthesizedAudio(mp3_bytes=b"ID3day2audio", duration_seconds=420),
+        )
+
+    assert not (tmp_path / "dist" / "feed.xml").exists()

@@ -1,6 +1,7 @@
 """RSS 2.0 Feed publishing for Episode audio and metadata."""
 
 import logging
+import shutil
 from dataclasses import dataclass
 from datetime import UTC, datetime, time
 from email.utils import format_datetime
@@ -39,9 +40,14 @@ class Feed(BaseModel):
     description: str
     language: str
     author: str
+    owner_email: str
+    category: str
+    subcategory: str
+    cover_path: str
     base_url: str
     releases_base_url: str
     dist_dir: Path
+    static_dir: Path = Path("static")
 
     @classmethod
     def from_settings(cls, settings: Settings) -> Feed:
@@ -51,14 +57,25 @@ class Feed(BaseModel):
             description=settings.podcast_description,
             language=settings.podcast_language,
             author=settings.podcast_author,
+            owner_email=settings.podcast_owner_email,
+            category=settings.podcast_category,
+            subcategory=settings.podcast_subcategory,
+            cover_path=settings.podcast_cover_path,
             base_url=settings.podcast_base_url,
             releases_base_url=settings.podcast_releases_base_url,
             dist_dir=settings.podcast_dist_dir,
+            static_dir=settings.podcast_static_dir,
         )
+
+    @property
+    def cover_url(self) -> str:
+        """Return the hosted master Feed cover URL."""
+        return f"{self.base_url.rstrip('/')}/{self.cover_path.lstrip('/')}"
 
     def publish(self, script: Script, audio: SynthesizedAudio) -> Episode:
         """Write Episode audio/metadata and regenerate newest-first feed.xml."""
         slug = script.published_at.isoformat()
+        self._stage_cover()
         episodes_dir = self.dist_dir / "episodes"
         episodes_dir.mkdir(parents=True, exist_ok=True)
 
@@ -88,6 +105,17 @@ class Feed(BaseModel):
         feed_path.write_text(self._render_rss(episodes), encoding="utf-8")
         logger.info("Published %s (%d episodes in %s)", slug, len(episodes), feed_path)
         return episode
+
+    def _stage_cover(self) -> None:
+        """Copy the master cover into the published directory, or fail loudly."""
+        relative_cover = self.cover_path.lstrip("/")
+        source = self.static_dir / relative_cover
+        if not source.is_file():
+            msg = f"Feed cover artwork not found at {source}"
+            raise FileNotFoundError(msg)
+        destination = self.dist_dir / relative_cover
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, destination)
 
     def _render_rss(self, episodes: list[Episode]) -> str:
         """Render an iTunes-compatible RSS 2.0 XML document ordered newest-first."""

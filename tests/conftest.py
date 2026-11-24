@@ -5,15 +5,19 @@ from pydantic import ValidationError
 
 from podcast.models import SpeechTurn
 from podcast.settings import Settings
+from tests.live_keys import live_key_skip_reason
 
 
 @pytest.fixture(scope="session")
 def live_settings() -> Settings:
-    """Return validated runtime Settings or skip live tests if API key is unset."""
+    """Return validated runtime Settings, skipping only when live API keys are unset."""
     try:
-        return Settings()
-    except ValidationError:
-        pytest.skip("OPENROUTER_API_KEY not configured")
+        return Settings(podcast_owner_email="owner@example.com")
+    except ValidationError as error:
+        reason = live_key_skip_reason(error, suite="live tests")
+        if reason is None:
+            raise
+        pytest.skip(reason)
 
 
 @pytest.fixture

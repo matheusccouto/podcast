@@ -60,6 +60,7 @@ Namespaces are one honking great idea -- let's do more of those!
 │   ├── agents/             # Editorial workflow and nested subagent packages (add/remove here)
 │   ├── tts.py              # Audio synthesis and MP3 encoding
 │   └── feed/               # RSS 2.0 publisher and XML template
+├── static/                 # Master Feed artwork staged for GitHub Pages
 └── tests/
     ├── conftest.py         # Shared test fixtures
     └── ...                 # Offline unit tests (default) and @pytest.mark.live tests

@@ -6,6 +6,15 @@
     <description>{{ feed.description }}</description>
     <language>{{ feed.language }}</language>
     <itunes:author>{{ feed.author }}</itunes:author>
+    <itunes:owner>
+      <itunes:name>{{ feed.author }}</itunes:name>
+      <itunes:email>{{ feed.owner_email }}</itunes:email>
+    </itunes:owner>
+    <itunes:category text="{{ feed.category }}">
+      <itunes:category text="{{ feed.subcategory }}" />
+    </itunes:category>
+    <itunes:type>episodic</itunes:type>
+    <itunes:image href="{{ feed.cover_url }}" />
     <itunes:explicit>false</itunes:explicit>
     <atom:link href="{{ feed_url }}" rel="self" type="application/rss+xml" />
 {% for item in items %}

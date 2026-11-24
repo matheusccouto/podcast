@@ -29,6 +29,7 @@ from pydantic import BaseModel, Field, SecretStr, ValidationError
 from evals.golden import CuratorGoldenCase, GoldenCase
 from podcast.models import MAX_CONTENT_CHARS, SpeechTurn
 from podcast.settings import Settings
+from tests.live_keys import live_key_skip_reason
 
 _WRITER_GOLDEN_DIR = Path(__file__).parent / "golden" / "writer"
 _CURATOR_GOLDEN_DIR = Path(__file__).parent / "golden" / "curator"
@@ -320,14 +321,18 @@ def curator_metrics() -> list[BaseMetric]:
 
 @pytest.fixture(scope="session")
 def eval_settings() -> Settings:
-    """Build Settings with canonical golden voice IDs for scriptwriter evals."""
+    """Build Settings for evals, skipping only when live API keys are unset."""
     try:
         return Settings(
+            podcast_owner_email="owner@example.com",
             persona_a_voice_id="persona_a",
             persona_b_voice_id="persona_b",
         )
-    except ValidationError:
-        pytest.skip("OPENROUTER_API_KEY not configured for evals")
+    except ValidationError as error:
+        reason = live_key_skip_reason(error, suite="evals")
+        if reason is None:
+            raise
+        pytest.skip(reason)
 
 
 @pytest.fixture(scope="session")
