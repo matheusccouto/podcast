@@ -59,10 +59,12 @@ def test_feed_publish_writes_artifacts_and_orders_rss_newest_first(
     ep1 = feed.publish(
         make_script(date(2026, 11, 14), "Dia Um"),
         SynthesizedAudio(mp3_bytes=b"ID3day1audio", duration_seconds=310),
+        cover_jpeg=b"\xff\xd8\xff\xe0day-one-cover",
     )
     ep2 = feed.publish(
         make_script(date(2026, 11, 15), "Dia Dois & Kernel"),
         SynthesizedAudio(mp3_bytes=b"ID3day2audio", duration_seconds=420),
+        cover_jpeg=b"\xff\xd8\xff\xe0day-two-cover",
     )
 
     assert (dist_dir / "episodes" / "2026-11-15.mp3").read_bytes() == b"ID3day2audio"
@@ -94,9 +96,10 @@ def test_feed_publish_writes_episode_cover_and_renders_item_itunes_image(
         SynthesizedAudio(mp3_bytes=b"ID3day1audio", duration_seconds=310),
         cover_jpeg=b"\xff\xd8\xff\xe0day-one-cover",
     )
-    uncovered = feed.publish(
+    second = feed.publish(
         make_script(date(2026, 11, 15), "Dia Dois"),
         SynthesizedAudio(mp3_bytes=b"ID3day2audio", duration_seconds=420),
+        cover_jpeg=b"\xff\xd8\xff\xe0day-two-cover",
     )
 
     cover_path = dist_dir / "episodes" / "2026-11-14.jpg"
@@ -104,7 +107,9 @@ def test_feed_publish_writes_episode_cover_and_renders_item_itunes_image(
     assert (
         covered.cover_url == "https://example.github.io/podcast/episodes/2026-11-14.jpg"
     )
-    assert uncovered.cover_url is None
+    assert (
+        second.cover_url == "https://example.github.io/podcast/episodes/2026-11-15.jpg"
+    )
 
     rss_xml = (dist_dir / "feed.xml").read_text(encoding="utf-8")
     day_one_start = rss_xml.index("<title>Dia Um</title>")
@@ -112,4 +117,4 @@ def test_feed_publish_writes_episode_cover_and_renders_item_itunes_image(
     day_two_start = rss_xml.index("<title>Dia Dois</title>")
     day_two_item = rss_xml[day_two_start : rss_xml.index("</item>", day_two_start)]
     assert f'<itunes:image href="{covered.cover_url}" />' in day_one_item
-    assert "<itunes:image" not in day_two_item
+    assert f'<itunes:image href="{second.cover_url}" />' in day_two_item

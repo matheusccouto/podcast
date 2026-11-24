@@ -61,7 +61,7 @@ class Feed(BaseModel):
         script: Script,
         audio: SynthesizedAudio,
         *,
-        cover_jpeg: bytes | None = None,
+        cover_jpeg: bytes,
     ) -> Episode:
         """Write Episode audio/metadata and regenerate newest-first feed.xml."""
         slug = script.published_at.isoformat()
@@ -70,10 +70,8 @@ class Feed(BaseModel):
 
         (episodes_dir / f"{slug}.mp3").write_bytes(audio.mp3_bytes)
 
-        cover_url = None
-        if cover_jpeg is not None:
-            (episodes_dir / f"{slug}.jpg").write_bytes(cover_jpeg)
-            cover_url = f"{self.base_url.rstrip('/')}/episodes/{slug}.jpg"
+        (episodes_dir / f"{slug}.jpg").write_bytes(cover_jpeg)
+        cover_url = f"{self.base_url.rstrip('/')}/episodes/{slug}.jpg"
 
         releases_base = self.releases_base_url.rstrip("/")
         episode = Episode(

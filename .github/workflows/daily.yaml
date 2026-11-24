@@ -47,8 +47,8 @@ jobs:
           CURATOR_MODEL: ${{ vars.CURATOR_MODEL || 'jev-1.14' }}
           LLM_MODEL: ${{ vars.LLM_MODEL || 'deepseek/deepseek-v4.1-flash' }}
           TTS_MODEL: ${{ vars.TTS_MODEL || 'google/gemini-3.8-flash-tts' }}
-          COVER_MODEL: ${{ vars.COVER_MODEL || 'google/gemini-nano-banana-2.1' }}
-          PODCAST_MASTER_COVER_PATH: static/cover.jpg
+          COVER_MODEL: ${{ vars.COVER_MODEL }}
+          PODCAST_MASTER_COVER_PATH: ${{ vars.PODCAST_MASTER_COVER_PATH }}
           PODCAST_BASE_URL: ${{ vars.PODCAST_BASE_URL || format('https://{0}.github.io/{1}', github.repository_owner, github.event.repository.name) }}
           PODCAST_RELEASES_BASE_URL: ${{ vars.PODCAST_RELEASES_BASE_URL || format('https://github.com/{0}/releases/download/episodes', github.repository) }}
           PODCAST_DIST_DIR: dist

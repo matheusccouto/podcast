@@ -192,6 +192,7 @@ async def test_podcast_graph_curates_writes_and_publishes(
     episode = Feed.from_settings(graph_settings).publish(
         script,
         SynthesizedAudio(mp3_bytes=b"ID3testbytes", duration_seconds=360),
+        cover_jpeg=b"\xff\xd8\xff\xe0live-cover",
     )
     assert episode.published_at == date(2026, 11, 15)
     assert (graph_settings.podcast_dist_dir / "feed.xml").exists()

@@ -2,7 +2,6 @@
 
 import base64
 import json
-import logging
 from collections.abc import Callable
 from datetime import date
 from pathlib import Path
@@ -12,8 +11,7 @@ import pytest
 from pydantic import SecretStr
 
 from podcast.cover import OpenRouterCover, headline, render_prompt
-from podcast.feed import Feed
-from podcast.models import Script, Segment, SpeechTurn, SynthesizedAudio
+from podcast.models import Script, Segment, SpeechTurn
 
 _ONE_PIXEL_PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
@@ -134,6 +132,7 @@ async def test_generate_posts_single_image_request_and_returns_1400_jpeg(
         cover = OpenRouterCover(
             api_key=SecretStr("test-key"),
             master_cover_path=master_cover,
+            model="google/gemini-nano-banana-2.1",
             client=client,
         )
         jpeg = await cover.generate(make_script(date(2026, 11, 24), "Edicao de hoje"))
@@ -158,27 +157,24 @@ async def test_generate_posts_single_image_request_and_returns_1400_jpeg(
     assert jpeg_size(jpeg) == (1400, 1400)
 
 
-async def test_generate_logs_and_returns_none_when_image_model_is_unavailable(
+async def test_generate_propagates_http_error_when_image_model_is_unavailable(
     master_cover: Path,
     make_script: Callable[[date, str], Script],
-    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """A failed OpenRouter call publishes the Episode without a cover, loudly logged."""
+    """A failed OpenRouter call raises instead of publishing a coverless Episode."""
     transport = httpx.MockTransport(
         lambda _request: httpx.Response(503, json={"error": "model overloaded"}),
     )
-    caplog.set_level(logging.WARNING, logger="podcast.cover")
 
     async with httpx.AsyncClient(transport=transport) as client:
         cover = OpenRouterCover(
             api_key=SecretStr("test-key"),
             master_cover_path=master_cover,
+            model="google/gemini-nano-banana-2.1",
             client=client,
         )
-        jpeg = await cover.generate(make_script(date(2026, 11, 24), "Edicao de hoje"))
-
-    assert jpeg is None
-    assert "publishing Episode without cover" in caplog.text
+        with pytest.raises(httpx.HTTPStatusError):
+            await cover.generate(make_script(date(2026, 11, 24), "Edicao de hoje"))
 
 
 async def test_generate_raises_when_response_holds_no_image(
@@ -194,32 +190,8 @@ async def test_generate_raises_when_response_holds_no_image(
         cover = OpenRouterCover(
             api_key=SecretStr("test-key"),
             master_cover_path=master_cover,
+            model="google/gemini-nano-banana-2.1",
             client=client,
         )
         with pytest.raises(ValueError, match="data"):
             await cover.generate(make_script(date(2026, 11, 24), "Edicao de hoje"))
-
-
-def test_episode_without_cover_renders_no_item_itunes_image(
-    tmp_path: Path,
-    make_script: Callable[[date, str], Script],
-) -> None:
-    """Feed.publish omits `<itunes:image>` for Episodes published without artwork."""
-    feed = Feed(
-        title="Daily Diff",
-        description="Descricao",
-        language="pt-BR",
-        author="Matheus Couto",
-        base_url="https://example.github.io/podcast",
-        releases_base_url="https://example.com/episodes",
-        dist_dir=tmp_path / "dist",
-    )
-    episode = feed.publish(
-        make_script(date(2026, 11, 24), "Edicao de hoje"),
-        SynthesizedAudio(mp3_bytes=b"ID3audio", duration_seconds=300),
-    )
-
-    assert episode.cover_url is None
-    assert not (tmp_path / "dist" / "episodes" / "2026-11-24.jpg").exists()
-    rss_xml = (tmp_path / "dist" / "feed.xml").read_text(encoding="utf-8")
-    assert "itunes:image" not in rss_xml

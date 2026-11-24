@@ -54,6 +54,7 @@ def test_cli_applies_option_overrides(
             audio_url="https://example.com/ep.mp3",
             duration_seconds=120,
             byte_length=4096,
+            cover_url="https://example.com/ep.jpg",
         )
 
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")

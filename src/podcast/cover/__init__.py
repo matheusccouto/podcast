@@ -1,7 +1,6 @@
 """Per-Episode cover artwork generation through OpenRouter image models."""
 
 import base64
-import logging
 from importlib import resources
 from pathlib import Path
 
@@ -10,8 +9,6 @@ from ffmpeg.asyncio import FFmpeg
 from pydantic import SecretStr
 
 from podcast.models import Script
-
-logger = logging.getLogger(__name__)
 
 _COVER_SIZE = 1400
 _HEADLINE_WORDS = 4
@@ -65,7 +62,7 @@ class OpenRouterCover:
         *,
         api_key: SecretStr,
         master_cover_path: Path,
-        model: str = "google/gemini-nano-banana-2.1",
+        model: str,
         base_url: str = "https://openrouter.ai/api/v1",
         client: httpx.AsyncClient | None = None,
     ) -> None:
@@ -84,7 +81,7 @@ class OpenRouterCover:
             "image_url": {"url": f"data:image/jpeg;base64,{encoded}"},
         }
 
-    async def generate(self, script: Script) -> bytes | None:
+    async def generate(self, script: Script) -> bytes:
         """Request the Episode artwork once and return a 1400x1400 JPEG."""
         payload: dict[str, object] = {
             "model": self.model,
@@ -98,30 +95,24 @@ class OpenRouterCover:
             "Authorization": f"Bearer {self.api_key.get_secret_value()}",
             "Content-Type": "application/json",
         }
-        try:
-            if self.client is None:
-                async with httpx.AsyncClient() as client:
-                    response = await client.post(
-                        f"{self.base_url}/images",
-                        headers=headers,
-                        json=payload,
-                        timeout=_REQUEST_TIMEOUT_SECONDS,
-                    )
-            else:
-                response = await self.client.post(
+        if self.client is None:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
                     f"{self.base_url}/images",
                     headers=headers,
                     json=payload,
                     timeout=_REQUEST_TIMEOUT_SECONDS,
                 )
-            response.raise_for_status()
-        except httpx.HTTPError as error:
-            logger.warning(
-                "Cover generation failed; publishing Episode without cover: %s", error
+        else:
+            response = await self.client.post(
+                f"{self.base_url}/images",
+                headers=headers,
+                json=payload,
+                timeout=_REQUEST_TIMEOUT_SECONDS,
             )
-            return None
+        response.raise_for_status()
 
-        data = response.json().get("data") or []
+        data = response.json().get("data")
         if not data:
             msg = "OpenRouter image response holds no data payload."
             raise ValueError(msg)
