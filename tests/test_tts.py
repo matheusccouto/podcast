@@ -2,7 +2,11 @@
 
 import json
 import math
+import re
+import shutil
 import struct
+import subprocess
+from pathlib import Path
 
 import httpx
 import pytest
@@ -10,9 +14,10 @@ from pydantic import SecretStr, ValidationError
 
 from podcast.models import SpeechTurn, SynthesizedAudio
 from podcast.settings import Settings
-from podcast.tts import OpenRouterTTS
+from podcast.tts import LOUDNESS_TARGET_LUFS, OpenRouterTTS
 
 _SAMPLE_VOICES = ("Puck", "Aoede")
+_LUFS_RE = re.compile(r"I:\s+(-?\d+\.\d+) LUFS")
 
 
 @pytest.fixture(scope="module")
@@ -24,6 +29,43 @@ def sine_pcm_one_second() -> bytes:
         for i in range(sample_rate)
     ]
     return struct.pack(f"<{sample_rate}h", *samples)
+
+
+@pytest.fixture(scope="module")
+def quiet_pcm_six_seconds() -> bytes:
+    """Generate 6 seconds of quiet 440Hz mono s16le PCM for loudness checks."""
+    sample_rate = 24_000
+    samples = [
+        round(400 * math.sin(2 * math.pi * 440 * i / sample_rate))
+        for i in range(sample_rate * 6)
+    ]
+    return struct.pack(f"<{len(samples)}h", *samples)
+
+
+def _measure_integrated_lufs(mp3_path: Path) -> float:
+    """Decode an MP3 through ffmpeg's ebur128 filter and return integrated LUFS."""
+    ffmpeg_bin = shutil.which("ffmpeg")
+    assert ffmpeg_bin is not None
+    result = subprocess.run(  # noqa: S603
+        [
+            ffmpeg_bin,
+            "-hide_banner",
+            "-nostats",
+            "-i",
+            str(mp3_path),
+            "-af",
+            "ebur128",
+            "-f",
+            "null",
+            "-",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    matches = _LUFS_RE.findall(result.stderr)
+    assert matches
+    return float(matches[-1])
 
 
 @pytest.fixture
@@ -108,6 +150,33 @@ async def test_synthesize_encodes_pcm_to_mp3_via_ffmpeg(
     ]
     assert audio.mp3_bytes[:3] == b"ID3"
     assert audio.duration_seconds == 1
+
+
+async def test_synthesize_normalizes_quiet_audio_to_target_loudness(
+    sample_turns: list[SpeechTurn],
+    quiet_pcm_six_seconds: bytes,
+    tmp_path: Path,
+) -> None:
+    """Quiet PCM is encoded to an MP3 whose integrated loudness hits -16 LUFS."""
+    transport = httpx.MockTransport(
+        lambda _req: httpx.Response(
+            200,
+            content=quiet_pcm_six_seconds,
+            headers={"content-type": "audio/pcm; rate=24000; channels=1"},
+        ),
+    )
+    async with httpx.AsyncClient(transport=transport) as client:
+        tts = OpenRouterTTS(api_key=SecretStr("unused"), client=client)
+        audio = await tts.synthesize(sample_turns, title="Teste Loudness")
+
+    mp3_path = tmp_path / "episode.mp3"
+    mp3_path.write_bytes(audio.mp3_bytes)
+
+    assert audio.duration_seconds == 6
+    assert _measure_integrated_lufs(mp3_path) == pytest.approx(
+        LOUDNESS_TARGET_LUFS,
+        abs=1.0,
+    )
 
 
 async def test_synthesize_splits_batches_and_forwards_instructions(

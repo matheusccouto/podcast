@@ -17,6 +17,13 @@ logger = logging.getLogger(__name__)
 _REQUEST_TIMEOUT_SECONDS = 180.0
 _BATCH_PAUSE_SECONDS = 0.15
 _DEFAULT_MAX_BATCH_CHARS = 2_400
+LOUDNESS_TARGET_LUFS = -16.0
+LOUDNESS_TRUE_PEAK_DB = -1.5
+LOUDNESS_RANGE_LU = 11.0
+_LOUDNORM_FILTER = (
+    f"loudnorm=I={LOUDNESS_TARGET_LUFS}:"
+    f"TP={LOUDNESS_TRUE_PEAK_DB}:LRA={LOUDNESS_RANGE_LU}"
+)
 _RATE_RE = re.compile(r"rate=(\d+)")
 _CHANNELS_RE = re.compile(r"channels=(\d+)")
 
@@ -172,7 +179,7 @@ class OpenRouterTTS:
         channels: int,
         title: str,
     ) -> bytes:
-        """Encode s16le PCM bytes into loudnorm-normalized ID3v2.3 MP3 via ffmpeg."""
+        """Encode s16le PCM bytes into -16 LUFS normalized ID3v2.3 MP3 via ffmpeg."""
         ffmpeg = (
             FFmpeg(executable=ffmpeg_bin)
             .option("y")
@@ -180,7 +187,7 @@ class OpenRouterTTS:
             .output(
                 "pipe:1",
                 {"codec:a": "libmp3lame", "b:a": "128k"},
-                af="loudnorm",
+                af=_LOUDNORM_FILTER,
                 write_id3v2=1,
                 id3v2_version=3,
                 metadata=f"title={title}",
