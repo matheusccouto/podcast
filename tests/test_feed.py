@@ -13,6 +13,7 @@ from podcast.models import Script, Segment, SpeechTurn, SynthesizedAudio
 from podcast.settings import Settings
 
 _NAMESPACES = {"itunes": "http://www.itunes.com/dtds/podcast-1.0.dtd"}
+_REPO_ROOT = Path(__file__).resolve().parents[1]
 _FEED_SETTING_ENV_VARS = (
     "PODCAST_TITLE",
     "PODCAST_LANGUAGE",
@@ -20,6 +21,7 @@ _FEED_SETTING_ENV_VARS = (
     "PODCAST_SUBCATEGORY",
     "PODCAST_COVER_PATH",
     "PODCAST_BASE_URL",
+    "PODCAST_STATIC_DIR",
 )
 
 
@@ -51,6 +53,7 @@ def feed(tmp_path: Path) -> Feed:
         base_url="https://example.github.io/podcast",
         releases_base_url="https://github.com/u/r/releases/download/latest",
         dist_dir=tmp_path / "dist",
+        static_dir=_REPO_ROOT / "static",
     )
 
 
@@ -97,6 +100,9 @@ def test_feed_publish_writes_artifacts_and_orders_rss_newest_first(
 
     assert (dist_dir / "episodes" / "2026-11-15.mp3").read_bytes() == b"ID3day2audio"
     assert (dist_dir / "episodes" / "2026-11-15.json").exists()
+    assert (dist_dir / "cover.jpg").read_bytes() == (
+        _REPO_ROOT / "static" / "cover.jpg"
+    ).read_bytes()
     assert (
         ep1.audio_url
         == "https://github.com/u/r/releases/download/latest/2026-11-14.mp3"
@@ -178,3 +184,22 @@ def test_default_cover_path_resolves_to_staged_static_artwork(
     static_dir = Path(__file__).resolve().parents[1] / "static"
 
     assert (static_dir / feed.cover_path).is_file()
+
+
+def test_publish_fails_before_writing_feed_when_cover_artwork_is_missing(
+    feed: Feed,
+    make_script: Callable[[date, str], Script],
+    tmp_path: Path,
+) -> None:
+    """Publish refuses to emit feed.xml when the cover is absent from static_dir."""
+    empty_static = tmp_path / "static-without-cover"
+    empty_static.mkdir()
+    coverless = feed.model_copy(update={"static_dir": empty_static})
+
+    with pytest.raises(FileNotFoundError, match=r"cover\.jpg"):
+        coverless.publish(
+            make_script(date(2026, 11, 15), "Dia Dois & Kernel"),
+            SynthesizedAudio(mp3_bytes=b"ID3day2audio", duration_seconds=420),
+        )
+
+    assert not (tmp_path / "dist" / "feed.xml").exists()

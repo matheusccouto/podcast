@@ -76,6 +76,10 @@ class Settings(BaseSettings):
         default=Path("dist"),
         description="Output directory for published RSS Feed and Episode files.",
     )
+    podcast_static_dir: Path = Field(
+        default=Path("static"),
+        description="Directory holding static Feed assets staged into dist.",
+    )
     persona_a_voice_id: CliSuppress[str] = "Charon"
     persona_b_voice_id: CliSuppress[str] = "Aoede"
 

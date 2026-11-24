@@ -29,13 +29,13 @@ from pydantic import BaseModel, Field, SecretStr, ValidationError
 from evals.golden import CuratorGoldenCase, GoldenCase
 from podcast.models import MAX_CONTENT_CHARS, SpeechTurn
 from podcast.settings import Settings
+from tests.live_keys import live_key_skip_reason
 
 _WRITER_GOLDEN_DIR = Path(__file__).parent / "golden" / "writer"
 _CURATOR_GOLDEN_DIR = Path(__file__).parent / "golden" / "curator"
 _LINE_COMMENT_RE = re.compile(r"//[^\n]*")
 _SYSTEM_ONE_URL = "https://openrouter.ai/api/v1/systemone"
 _DEFAULT_JEV_MODEL = "jev-1.14"
-_EVAL_KEY_FIELDS = frozenset({"openrouter_api_key", "exa_api_key"})
 
 
 class _NoulPayload(BaseModel):
@@ -329,13 +329,10 @@ def eval_settings() -> Settings:
             persona_b_voice_id="persona_b",
         )
     except ValidationError as error:
-        missing = {
-            detail["loc"][0] for detail in error.errors() if detail["type"] == "missing"
-        }
-        if not missing or not missing <= _EVAL_KEY_FIELDS:
+        reason = live_key_skip_reason(error, suite="evals")
+        if reason is None:
             raise
-        reason = ", ".join(sorted(map(str, missing)))
-        pytest.skip(f"live API keys not configured for evals: {reason}")
+        pytest.skip(reason)
 
 
 @pytest.fixture(scope="session")

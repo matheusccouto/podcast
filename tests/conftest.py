@@ -5,8 +5,7 @@ from pydantic import ValidationError
 
 from podcast.models import SpeechTurn
 from podcast.settings import Settings
-
-_LIVE_KEY_FIELDS = frozenset({"openrouter_api_key", "exa_api_key"})
+from tests.live_keys import live_key_skip_reason
 
 
 @pytest.fixture(scope="session")
@@ -15,13 +14,10 @@ def live_settings() -> Settings:
     try:
         return Settings(podcast_owner_email="owner@example.com")
     except ValidationError as error:
-        missing = {
-            detail["loc"][0] for detail in error.errors() if detail["type"] == "missing"
-        }
-        if not missing or not missing <= _LIVE_KEY_FIELDS:
+        reason = live_key_skip_reason(error, suite="live tests")
+        if reason is None:
             raise
-        reason = ", ".join(sorted(map(str, missing)))
-        pytest.skip(f"live API keys not configured: {reason}")
+        pytest.skip(reason)
 
 
 @pytest.fixture
