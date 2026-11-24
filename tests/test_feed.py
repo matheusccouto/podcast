@@ -164,3 +164,17 @@ def test_feed_renders_required_itunes_metadata_and_summary_only(
 
     descriptions = [item.findtext("description") for item in channel.findall("item")]
     assert descriptions == ["Resumo tecnico do dia."]
+
+
+def test_default_cover_path_resolves_to_staged_static_artwork() -> None:
+    """The iTunes image href points at artwork the Pages deployment actually ships."""
+    settings = Settings(
+        openrouter_api_key=SecretStr("test-openrouter-key"),
+        exa_api_key=SecretStr("test-exa-key"),
+        podcast_owner_email="owner@example.com",
+        _env_file=None,
+    )
+    feed = Feed.from_settings(settings)
+    static_dir = Path(__file__).resolve().parents[1] / "static"
+
+    assert (static_dir / feed.cover_path).is_file()
