@@ -11,7 +11,7 @@ C4Component
         Component(entry, "CLI & Core", "__main__.py, settings.py, models.py", "CLI entrypoint, settings, shared HTTP client & domain models")
         Component(ingestion, "Ingestion Adapters", "sources/, fetcher.py", "Source & ContentFetcher protocols and adapters")
         Component(agents, "Editorial Workflow", "agents/", "Workflow orchestrating nested Curator & Writer subagents")
-        Component(tts, "Audio Synthesizer", "tts.py", "Multi-speaker TTS synthesis and -16 LUFS normalized MP3 encoding")
+        Component(tts, "Audio Synthesizer", "tts.py", "Multi-speaker TTS synthesis, stinger decode & crossfade, and -16 LUFS normalized MP3 encoding")
         Component(publishing, "Feed Publisher", "feed/", "Renders RSS 2.0 template and writes Episode JSON/MP3")
     }
 

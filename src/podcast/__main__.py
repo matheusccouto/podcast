@@ -15,7 +15,7 @@ from podcast.fetcher import ExaFetcher
 from podcast.models import Episode, Script, validate_persona_voices
 from podcast.settings import Settings
 from podcast.sources import HackerNewsSource
-from podcast.tts import OpenRouterTTS
+from podcast.tts import OpenRouterTTS, StingerPaths
 
 
 async def run_daily(
@@ -50,8 +50,10 @@ async def run_daily(
         tts = OpenRouterTTS(
             api_key=resolved.openrouter_api_key,
             model=resolved.tts_model,
-            intro_path=resolved.podcast_intro_path,
-            outro_path=resolved.podcast_outro_path,
+            stingers=StingerPaths(
+                intro=resolved.podcast_intro_path,
+                outro=resolved.podcast_outro_path,
+            ),
             client=client,
         )
         audio = await tts.synthesize(script.turns, title=script.title)

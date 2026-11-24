@@ -16,7 +16,7 @@ from pydantic import SecretStr, ValidationError
 
 from podcast.models import SpeechTurn, SynthesizedAudio
 from podcast.settings import Settings
-from podcast.tts import OpenRouterTTS
+from podcast.tts import OpenRouterTTS, StingerPaths
 
 _SAMPLE_VOICES = ("Puck", "Aoede")
 _LOUDNESS_TARGET_LUFS = -16.0
@@ -59,28 +59,26 @@ def nonstationary_pcm_six_seconds() -> bytes:
     )
 
 
-def _measure_integrated_lufs(mp3_path: Path) -> float:
-    """Decode an MP3 through ffmpeg's ebur128 filter and return integrated LUFS."""
+def _run_ffmpeg(
+    arguments: list[str],
+    *,
+    stdin_bytes: bytes = b"",
+) -> subprocess.CompletedProcess[bytes]:
+    """Run ffmpeg once for offline audio assertions, failing loudly on error."""
     ffmpeg_bin = shutil.which("ffmpeg")
     assert ffmpeg_bin is not None
-    result = subprocess.run(  # noqa: S603
-        [
-            ffmpeg_bin,
-            "-hide_banner",
-            "-nostats",
-            "-i",
-            str(mp3_path),
-            "-af",
-            "ebur128",
-            "-f",
-            "null",
-            "-",
-        ],
+    return subprocess.run(  # noqa: S603
+        [ffmpeg_bin, "-hide_banner", "-nostats", *arguments],
+        input=stdin_bytes,
         check=True,
         capture_output=True,
-        text=True,
     )
-    matches = _LUFS_RE.findall(result.stderr)
+
+
+def _measure_integrated_lufs(mp3_path: Path) -> float:
+    """Decode an MP3 through ffmpeg's ebur128 filter and return integrated LUFS."""
+    result = _run_ffmpeg(["-i", str(mp3_path), "-af", "ebur128", "-f", "null", "-"])
+    matches = _LUFS_RE.findall(result.stderr.decode("utf-8", errors="replace"))
     assert matches
     return float(matches[-1])
 
@@ -102,14 +100,8 @@ def _write_sine_wav(
 
 def _decode_mp3_samples(mp3_bytes: bytes) -> list[int]:
     """Decode MP3 bytes to mono 24 kHz s16le samples for ordering assertions."""
-    ffmpeg_bin = shutil.which("ffmpeg")
-    assert ffmpeg_bin is not None
-    result = subprocess.run(  # noqa: S603
+    result = _run_ffmpeg(
         [
-            ffmpeg_bin,
-            "-hide_banner",
-            "-loglevel",
-            "error",
             "-i",
             "pipe:0",
             "-f",
@@ -120,9 +112,7 @@ def _decode_mp3_samples(mp3_bytes: bytes) -> list[int]:
             str(_DECODE_SAMPLE_RATE),
             "pipe:1",
         ],
-        input=mp3_bytes,
-        check=True,
-        capture_output=True,
+        stdin_bytes=mp3_bytes,
     )
     return list(struct.unpack(f"<{len(result.stdout) // 2}h", result.stdout))
 
@@ -398,8 +388,7 @@ async def test_synthesize_crossfades_intro_speech_and_outro(
     async with httpx.AsyncClient(transport=transport) as client:
         tts = OpenRouterTTS(
             api_key=SecretStr("unused"),
-            intro_path=intro_path,
-            outro_path=outro_path,
+            stingers=StingerPaths(intro=intro_path, outro=outro_path),
             client=client,
         )
         audio = await tts.synthesize(sample_turns, title="Teste Stingers")
@@ -441,11 +430,50 @@ async def test_synthesize_fails_loudly_when_stinger_file_is_missing(
     """A configured stinger path that does not exist raises FileNotFoundError."""
     tts = OpenRouterTTS(
         api_key=SecretStr("unused"),
-        intro_path=tmp_path / "missing-intro.mp3",
+        stingers=StingerPaths(intro=tmp_path / "missing-intro.mp3"),
     )
 
     with pytest.raises(FileNotFoundError, match="Stinger audio file not found"):
         await tts.synthesize(sample_turns, title="Missing Stinger")
+
+
+async def test_synthesize_crossfades_outro_only_with_explicit_input_labels(
+    sample_turns: list[SpeechTurn],
+    tmp_path: Path,
+) -> None:
+    """Outro-only keeps dialogue as input 0 and the outro as input 1, not shifted."""
+    outro_path = tmp_path / "outro-only.wav"
+    _write_sine_wav(outro_path, seconds=3.0, frequency=700.0)
+    speech_pcm = _sine_pcm(3.0, 440.0)
+    transport = httpx.MockTransport(
+        lambda _req: httpx.Response(
+            200,
+            content=speech_pcm,
+            headers={"content-type": "audio/pcm; rate=24000; channels=1"},
+        ),
+    )
+
+    async with httpx.AsyncClient(transport=transport) as client:
+        tts = OpenRouterTTS(
+            api_key=SecretStr("unused"),
+            stingers=StingerPaths(outro=outro_path),
+            client=client,
+        )
+        audio = await tts.synthesize(sample_turns, title="Teste So Outro")
+
+    samples = _decode_mp3_samples(audio.mp3_bytes)
+    # 3s speech + 3s outro minus one 0.5s crossfade must land on 5.5s.
+    assert len(samples) / _DECODE_SAMPLE_RATE == pytest.approx(5.5, rel=0.02)
+    assert _zero_crossing_frequency(
+        samples,
+        sample_start=0.5,
+        sample_span=0.5,
+    ) == pytest.approx(440.0, rel=0.05)
+    assert _zero_crossing_frequency(
+        samples,
+        sample_start=4.5,
+        sample_span=0.5,
+    ) == pytest.approx(700.0, rel=0.05)
 
 
 @pytest.mark.live

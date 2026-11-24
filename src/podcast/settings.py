@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, CliSuppress, SettingsConfigDict
 
 from podcast.models import Persona
@@ -76,6 +76,14 @@ class Settings(BaseSettings):
     )
     persona_a_voice_id: CliSuppress[str] = "Charon"
     persona_b_voice_id: CliSuppress[str] = "Aoede"
+
+    @field_validator("podcast_intro_path", "podcast_outro_path", mode="before")
+    @classmethod
+    def _blank_path_is_unset(cls, value: object) -> object:
+        """Treat a blank env var (e.g. an unset CI variable) as no stinger."""
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
     @property
     def personas(self) -> tuple[Persona, Persona]:
